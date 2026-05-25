@@ -9,7 +9,7 @@
 - [ ] Speed change
 - [x] Robotic distortion
 - [ ] Timbre change
-- [-] Noise elimination
+- [x] Noise elimination (needs improvement)
 
 ### Front end
 
