@@ -7,8 +7,9 @@
 ### Core
 - [ ] Pitch change
 - [ ] Speed change
-- [ ] Robotic distortion
+- [x] Robotic distortion
 - [ ] Timbre change
+- [-] Noise elimination
 
 ### Front end
 
