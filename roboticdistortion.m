@@ -1,20 +1,6 @@
 clear; close all;
 
-inputFile = 'inputfiles/voice-sample.wav' % change this to input file path, need to adjust for website uploading
-
-% Guys, I don't know if this is necessary
-% like we could just force the user to upload .wav files
-% But this allows for m4a input as well, which is common on phones
-% If it's m4a, convert to wav first
-[~, ~, ext] = fileparts(inputFile);
-if strcmpi(ext, '.m4a')
-    fprintf('Converting %s to WAV...\n', inputFile);
-    [audio, fs] = audioread(inputFile);
-    wavFile = strrep(inputFile, ext, '.wav');
-    audiowrite(wavFile, audio, fs);
-    fprintf('Saved as: %s\n', wavFile);
-    inputFile = wavFile;  % Use the new wav file
-end
+inputFile = 'outputs/noiseReduced.wav';  % Path to your input noise-reduced audio file
 
 [audio, fs] = audioread(inputFile); 
 audio = audio(:,1);  
@@ -37,10 +23,7 @@ for i = 1:numWindows
     frameWindowed = frame .* win;
     % DFT
     F = fft(frameWindowed);
-    % NOISE REDUCTION 
-    mag = abs(F);
-    mag_clean = mag .* (mag > noiseGateThreshold * max(mag));  
-    F_clean = mag_clean .* exp(1j * angle(F));
+    
     % ROBOT EFFECT 
     % Frequency shift, makes it sound mechanical
     shift = round(length(F) * shiftAmount);  % shift by shiftAmount% of spectrum
@@ -48,7 +31,7 @@ for i = 1:numWindows
     % Randomize phase for more metallic sound
     mag = abs(F_robot);
     % uncomment one of the two lines below for random or zero phase
-    %phase = angle(F_robot) + (rand(size(F_robot))-0.5)*phaseRand; % random phase
+    phase = angle(F_robot) + (rand(size(F_robot))-0.5)*phaseRand; % random phase
     phase = zeros(size(F_robot));   % zero phase instead of random, for more robotic sound
     F_robot = mag .* exp(1j * phase);
     
@@ -62,4 +45,4 @@ end
 output = output / max(abs(output));
 sound(output, fs);
 % Save output
-audiowrite('robotic_voice.wav', output, fs);
+audiowrite('outputsrobotic_voice.wav', output, fs);

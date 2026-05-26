@@ -11,6 +11,8 @@
 - [ ] Timbre change
 - [x] Noise elimination (needs improvement)
 
+Preprocessing is a function, to do robotic distortion, run these: in order `noisereduction.m` -> `roboticdistortion.m` 
+
 ### Front end
 
 ### Back end
@@ -19,4 +21,16 @@
 
 ### Misc
 - [ ] `run_me`
+- [ ] adjustable extend/strength of effect
 
+```mermaid
+flowchart TD
+
+A[noisereduction.m] --> B[roboticdistortion.m]
+
+A --> C[filtering.m]
+
+A --> D[equalizer.m]
+
+
+```
