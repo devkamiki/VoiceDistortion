@@ -1,6 +1,6 @@
 clear; close all;
 
-inputFile = 'inputfiles/Recording.m4a'
+inputFile = 'inputfiles/voice-sample.wav' % change this to input file path, need to adjust for website uploading
 
 % Guys, I don't know if this is necessary
 % like we could just force the user to upload .wav files
@@ -22,7 +22,7 @@ audio = audio / max(abs(audio));  % Normalize
 % Parameters
 windowSize = 1024;      % FFT size 
 hopSize = windowSize / 4;  % Overlap, 75%
-shiftAmount = 0.03; %  how much we shift the frequencies, smaller=more natural
+shiftAmount = 0.001; %  how much we shift the frequencies, smaller=more natural
 phaseRand = 0.3; % phase randomization amount
 noiseGateThreshold = 0.15; % decides how much noise to remove, higher = more aggressive
 % Process with STFT 
@@ -47,8 +47,11 @@ for i = 1:numWindows
     F_robot = [F(shift+1:end); zeros(shift,1)];  % simple shift
     % Randomize phase for more metallic sound
     mag = abs(F_robot);
-    phase = angle(F_robot) + (rand(size(F_robot))-0.5)*phaseRand;  
+    % uncomment one of the two lines below for random or zero phase
+    %phase = angle(F_robot) + (rand(size(F_robot))-0.5)*phaseRand; % random phase
+    phase = zeros(size(F_robot));   % zero phase instead of random, for more robotic sound
     F_robot = mag .* exp(1j * phase);
+    
     % Inverse DFT
     frameOut = real(ifft(F_robot));
     frameOut = frameOut .* win;  % window again
