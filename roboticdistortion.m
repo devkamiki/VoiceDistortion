@@ -1,6 +1,6 @@
 clear; close all;
 
-inputFile = 'outputs/noiseReduced.wav';  % Path to your input noise-reduced audio file
+inputFile = 'inputfiles/voice-sample.wav';  % Path to your input noise-reduced audio file
 
 [audio, fs] = audioread(inputFile); 
 audio = audio(:,1);  
@@ -10,7 +10,7 @@ windowSize = 1024;      % FFT size
 hopSize = windowSize / 4;  % Overlap, 75%
 shiftAmount = 0.001; %  how much we shift the frequencies, smaller=more natural
 phaseRand = 0.3; % phase randomization amount
-noiseGateThreshold = 0.15; % decides how much noise to remove, higher = more aggressive
+%noiseGateThreshold = 0.15; % decides how much noise to remove, higher = more aggressive
 % Process with STFT 
 numWindows = floor((length(audio) - windowSize)/hopSize) + 1;
 output = zeros(size(audio));
