@@ -7,8 +7,11 @@ clear; close all; clc;
 %to the right in case better see the differences.
 
 % ---------- Load two audio files ----------
-[x1, fs1] = audioread('voice-sample.wav');        % Signal 1
-[x2, fs2] = audioread('robotic_voice.wav');     % Signal 2
+Inputfile = fullfile('inputfiles', 'music-sample.wav');
+Outputfile = fullfile('outputs', 'equalized_voice.wav');
+
+[x1, fs1] = audioread(Inputfile);       % Signal 1
+[x2, fs2] = audioread(Outputfile);     % Signal 2
 
 % ---------- Convert stereo to mono if needed ----------
 x1 = mean(x1, 2);

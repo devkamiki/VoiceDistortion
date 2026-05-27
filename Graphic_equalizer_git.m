@@ -1,6 +1,6 @@
 clear; close all;
 
-inputFile = 'voice-sample.wav';
+inputFile = fullfile('inputfiles', 'music-sample.wav');
 
 [audio, fs] = audioread(inputFile);
 audio = audio(:,1);
@@ -71,4 +71,4 @@ output = output / max(abs(output));
 sound(output, fs);
 
 % Save
-audiowrite('equalized_voice.wav', output, fs);
+audiowrite('outputs/equalized_voice.wav', output, fs);
