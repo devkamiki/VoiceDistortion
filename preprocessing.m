@@ -53,6 +53,12 @@ function [output, fs] = preprocessing(inputFile, noiseGateThreshold)
     if max(abs(output)) > 0
         output = output * peakIn / max(abs(output));
     end
+    % optional post-normalization volume boost (1.0 = no boost)
+    volumeBoost = 500.0;
+    output = output * volumeBoost;
+    % hard clip to [-1,1] to avoid overflow when writing audio
+    output(output>1) = 1;
+    output(output<-1) = -1;
 
-    fprintf('Noise reduction completed (threshold = %.3f)\n', noiseGateThreshold);
+    fprintf('Noise reduction completed (threshold = %.3f, boost=%.2f)\n', noiseGateThreshold, volumeBoost);
 end

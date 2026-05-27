@@ -32,11 +32,11 @@ flowchart TD
  P-->O
 ```
 ### Core
-- [ ] Pitch change
-- [ ] Speed change
+- [x] Low/high pass filtering
+- [ ] Equalizer
 - [x] Robotic distortion
-- [ ] Timbre change
-- [x] Noise elimination (needs improvement)
+- [ ] Chorus
+- [x] Noise elimination
 
 Preprocessing is a function, to do robotic distortion, run these: in order `noisereduction.m` -> `roboticdistortion.m` 
 
