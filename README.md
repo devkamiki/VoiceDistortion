@@ -1,6 +1,10 @@
 # Voice Distortion Tool
 
-## License [AGPL-3.0](https://github.com/devkamiki/VoiceDistortion?tab=AGPL-3.0-1-ov-file)
+## License 
+
+The code from this repository is licensed under [AGPL-3.0](https://github.com/devkamiki/VoiceDistortion?tab=AGPL-3.0-1-ov-file).
+
+All the sample audio clips are downloaded from https://samplefile.com, and usages of them must follow their [ToS](https://samplefile.com/terms-of-service).
 
 ## Roadmaps
 
