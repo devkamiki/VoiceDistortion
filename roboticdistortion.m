@@ -45,4 +45,4 @@ end
 output = output / max(abs(output));
 sound(output, fs);
 % Save output
-audiowrite('outputsrobotic_voice.wav', output, fs);
+audiowrite('outputs/robotic_voice.wav', output, fs);
