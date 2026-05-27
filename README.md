@@ -4,7 +4,7 @@
 
 The code from this repository is licensed under [AGPL-3.0](https://github.com/devkamiki/VoiceDistortion?tab=AGPL-3.0-1-ov-file).
 
-All the sample audio clips except `singing-sample.wav` are downloaded from https://samplefile.com, and usages of them must follow their [ToS](https://samplefile.com/terms-of-service). `singing-sample.wav` is downloaded from https://samplefocus.com/, license of which could be found [here](https://samplefocus.com/license).
+All the sample audio clips except `singing-sample.wav` and `singingm4a-sample.m4a` are downloaded from https://samplefile.com, and usages of them must follow their [ToS](https://samplefile.com/terms-of-service). `singing-sample.wav` is downloaded from https://samplefocus.com/, license of which could be found [here](https://samplefocus.com/license). I sang and recorded `singingm4a-sample.m4a`, and thus all rights reserved :)
 
 ## Roadmaps
 
@@ -41,7 +41,8 @@ flowchart TD
 Preprocessing is a function, to do robotic distortion, run these: in order `noisereduction.m` -> `roboticdistortion.m` 
 
 ### Frontend
-
+- [ ] User input
+    (parameters: semitones for pitch shifting, noise reduction strength(0=none), filtering thresholds, shiftAmount for robotic distortion)  
 ### Backend
 
 ### Robustness Analysis
@@ -66,3 +67,5 @@ A --> D[equalizer.m]
 `music-sample.wav` is for testing `filtering.m`.
 
 `voice-sample.wav` is for testing `roboticdistortion.m`.
+
+`singing-sample.wav` is for testing `chorus.m`.
