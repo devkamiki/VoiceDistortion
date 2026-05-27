@@ -4,7 +4,7 @@
 
 The code from this repository is licensed under [AGPL-3.0](https://github.com/devkamiki/VoiceDistortion?tab=AGPL-3.0-1-ov-file).
 
-All the sample audio clips are downloaded from https://samplefile.com, and usages of them must follow their [ToS](https://samplefile.com/terms-of-service).
+All the sample audio clips except `singing-sample.wav` are downloaded from https://samplefile.com, and usages of them must follow their [ToS](https://samplefile.com/terms-of-service). `singing-sample.wav` is downloaded from https://samplefocus.com/, license of which could be found [here](https://samplefocus.com/license).
 
 ## Roadmaps
 
