@@ -35,7 +35,7 @@ flowchart TD
 - [x] Low/high pass filtering
 - [ ] Equalizer
 - [x] Robotic distortion
-- [ ] Chorus
+- [x] Chorus (it worked, but the voice is not very beautiful)
 - [x] Noise elimination
 
 Preprocessing is a function, to do robotic distortion, run these: in order `noisereduction.m` -> `roboticdistortion.m` 

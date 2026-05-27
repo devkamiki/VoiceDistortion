@@ -3,9 +3,9 @@ clear; close all; clc;
 inputFile = 'inputfiles/singing-sample.wav';           
 outputFile = 'outputs/chorus.wav';
 
-numVoices = 7;  % number of chorus voices
-pitchShifts = [-6, -4, -8, 0, 4, 6, 8];   % semitones,半音
-delays = [0.02, 0.03,0, 0.04, 0.06, 0.05, 0.01];     % seconds
+numVoices = 4;  % number of chorus voices
+pitchShifts = [-4,0,4,8];   % semitones, 我这里放+-两个全音和四个全音（4的倍数），听起来比较和谐
+delays = [0,0.02,0.04,0.06];     % seconds
 
 % STFT params
 windowLength = 1024;
