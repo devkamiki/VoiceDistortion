@@ -24,7 +24,7 @@ flowchart TD
  J --> L
  K --> L
  N[Reflection on AI assisted reasoning]
- O[`run_me` file]
+ O["run_me" file]
  L --> M[Submitting source code, video, and reflection]
  O --> M
  N --> M
