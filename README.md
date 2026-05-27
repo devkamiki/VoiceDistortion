@@ -34,3 +34,8 @@ A --> D[equalizer.m]
 
 
 ```
+
+## Tutorials on how to use sample files
+`music-sample.wav` is for testing `filtering.m`.
+
+`voice-sample.wav` is for testing `roboticdistortion.m`.
