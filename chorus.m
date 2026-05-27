@@ -1,11 +1,11 @@
 clear; close all; clc;
 
 inputFile = 'inputfiles/singing-sample.wav';           
-outputFile = 'outputs/chorus.wav';
+outputFile = 'outputs/chorus2.wav';
 
-numVoices = 4;  % number of chorus voices
-pitchShifts = [-4,0,4,8];   % semitones, 我这里放+-两个全音和四个全音（4的倍数），听起来比较和谐
-delays = [0,0.02,0.04,0.06];     % seconds
+numVoices = 21; % number of chorus voices
+pitchShifts = -8.0:0.8:8.0;   % semitones
+delays = 0.1:-0.005:0;     % seconds
 
 % STFT params
 windowLength = 1024;
@@ -25,7 +25,11 @@ for v = 1:numVoices
     shifted = pitchShift(x, fs, pitchShifts(v), windowLength, overlap);
     
     delaySamples = round(delays(v) * fs);
-    delayed = [zeros(delaySamples, 1); shifted(1:end-delaySamples)];
+    if delaySamples >= 0
+        delayed = [zeros(delaySamples, 1); shifted(1:end-delaySamples)];
+    else
+        delayed = [shifted(-delaySamples+1:end); zeros(-delaySamples, 1)];
+    end
     
     y = y + delayed / numVoices;
 end
