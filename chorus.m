@@ -9,7 +9,7 @@ pitchShifts = [-9,-8, -0.22, -0.10, 0, 0.10, 0.22, 0.35];   % semitones
 
 % Manual delays, same number as pitchShifts
 % Avoid 0 second delay to reduce comb filtering
-delays = [0.008, 0.012, 0.016, 0.020, 0.024, 0.028, 0.032];  % seconds
+delays = [0.008, 0.012, 0.016, 0.020, 0.024, 0.028, 0.032, 0.004];  % seconds
 
 numVoices = length(pitchShifts);
 
@@ -202,6 +202,6 @@ function y = makeWarmAndThick(x, fs)
 
 end
 
-outputSignal = audioread('outputs/chorus.wav');   
-[~, Fs] = audioread(inputFile);   
+outputSignal = y_thick;
+Fs = fs;
 end

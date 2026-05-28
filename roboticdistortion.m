@@ -1,6 +1,6 @@
 function [outputSignal, Fs] = roboticdistortion(inputFile)
 if nargin < 1
-    inputFile = 'inputfiles/singing-sample.wav';  % fallback
+    inputFile = 'inputfiles/voice-sample.wav';  % fallback
 end
 
 
