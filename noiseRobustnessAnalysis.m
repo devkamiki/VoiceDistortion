@@ -15,13 +15,13 @@ function noiseRobustnessAnalysis()
 
     for t = 1:length(tests)
         test = tests{t};
-        fprintf('=== %s ===\n', test.name);
+        fprintf(' %s \n', test.name);
 
         [cleanSig, Fs] = audioread(test.input);
         cleanSig = mean(cleanSig, 2);
         cleanSig = cleanSig / max(abs(cleanSig) + eps);
 
-        % Baseline: process the clean signal once
+        % Baseline
         cleanPath = fullfile(tempdir, sprintf('clean_%s.wav', test.name));
         audiowrite(cleanPath, cleanSig, Fs);
         cleanProc = runEffectQuiet(test.func, cleanPath);
@@ -60,7 +60,7 @@ function noiseRobustnessAnalysis()
             legendEntries{end+1} = sprintf('SNR_{in}=%d dB', snrIn); %#ok<AGROW>
         end
 
-        title(sprintf('%s - Output Spectrum vs Input Noise', test.name));
+        title(sprintf('%s - Output spectrum with regard of input noise SNR', test.name));
         xlabel('Frequency (Hz)'); ylabel('Magnitude (dB)');
         legend(legendEntries); grid on; xlim([0 Fs/2]); ylim([-80 5]);
         saveas(fig, fullfile(outputDir, sprintf('%s.png', test.name)));
