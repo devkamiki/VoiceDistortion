@@ -1,15 +1,13 @@
-clear; close all; clc;
-
-inputFile = 'inputfiles/singing-sample.wav';
-outputFile = 'outputs/chorus_warm_thick2.wav';
-
+function [outputSignal, Fs] = chorus(inputFile)
+if nargin < 1
+    inputFile = 'inputfiles/singing-sample.wav';  % fallback
+end
 
 
 % Small pitch detune for natural thick chorus
 pitchShifts = [-9,-8, -0.22, -0.10, 0, 0.10, 0.22, 0.35];   % semitones
 
 % Manual delays, same number as pitchShifts
-% Avoid 0 second delay to reduce comb filtering
 delays = [0.008, 0.012, 0.016, 0.020, 0.024, 0.028, 0.032, 0.036];  % seconds
 
 numVoices = length(pitchShifts);
@@ -18,7 +16,7 @@ if length(delays) ~= numVoices
     error('The number of delays must match the number of pitch shifts.');
 end
 
-% Delay overlap grouping
+
 binSize = 0.004;     % 4 ms resolution
 delayBins = round(delays(:) / binSize);
 
@@ -38,9 +36,7 @@ dryMix = 0.90;
 directMix = 0.35;        % keep original voice for clarity/thickness
 chorusMix = 0.65;
 
-% ============================================================
-% READ AUDIO
-% ============================================================
+% reading audio input and normalization
 
 [x, fs] = audioread(inputFile);
 
@@ -53,14 +49,6 @@ x = x / max(abs(x) + eps);
 
 y = zeros(size(x));
 
-% ============================================================
-% SHOW DELAY LIST
-% ============================================================
-
-fprintf('\n========== MANUAL DELAY LIST ==========\n');
-fprintf('Sampling frequency: %d Hz\n', fs);
-fprintf('Number of voices: %d\n', numVoices);
-fprintf('Delay bin size: %.4f s\n\n', binSize);
 
 delayTable = table((1:numVoices)', pitchShifts(:), delays(:), ...
     round(delays(:) * fs), delayBins(:), counts(idx), ...
@@ -69,9 +57,7 @@ delayTable = table((1:numVoices)', pitchShifts(:), delays(:), ...
 
 disp(delayTable);
 
-% ============================================================
-% CHORUS PROCESSING
-% ============================================================
+% chorus processing with weighted overlap-add based on delay bin counts
 
 for v = 1:numVoices
 
@@ -214,3 +200,29 @@ function y = makeWarmAndThick(x, fs)
     y = real(ifft(Y));
 
 end
+
+
+if ~exist('outputSignal', 'var')
+    if exist('processed', 'var')          
+        outputSignal = processed;
+    elseif exist('y_out', 'var')
+        outputSignal = y_out;
+    elseif exist('output', 'var')
+        outputSignal = output;
+    else
+        
+        vars = whos;
+        for i = 1:length(vars)
+            if contains(vars(i).name, {'out','processed','y','signal','audio'}, 'IgnoreCase',true)
+                outputSignal = eval(vars(i).name);
+                break;
+            end
+        end
+    end
+end
+
+if ~exist('Fs', 'var') && exist('fs', 'var')
+    Fs = fs;
+end
+
+end  
