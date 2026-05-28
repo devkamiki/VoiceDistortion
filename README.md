@@ -52,16 +52,15 @@ This main function calls a function which is a realization of phase vocoder: `pi
 
 
 
-#### 
 
-### Main conclusions from spectrum analysis
+## Main conclusions from spectrum analysis
 
 `Visualize_compare.m`
 
-### Robust analysis
+## Robust analysis
 
-#### Noise robustness
+### Noise robustness
 
-#### Resolution
+### Resolution
 
-### Web app rewritten in JavaScript
+## Web app rewritten in JavaScript
