@@ -1,7 +1,7 @@
 clear; close all; clc;
 
-inputFile = 'inputfiles/singing-sample.wav';
-outputFile = 'outputs/chorus_warm_thick.wav';
+inputFile = 'inputfiles/singingm4a-sample.wav';
+outputFile = 'outputs/chorus_warm_thick2.wav';
 
 % ============================================================
 % USER SETTINGS
