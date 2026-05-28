@@ -14,8 +14,4 @@ For each function, it takes one parameter as input, that is to say, the path of 
 
 If you provide empty parameter, for example, `filtering()`, it will fallback to process the sample audio of our choice.
 
-#### `filtering()`
-
-This is a direct DFT bandpass filter.
-
-This function takes the DFT of the entire signal at once  (`fft`), builds a binary frequency-domain mask that is 1 between 300 Hz and 3000 Hz and 0 everywhere else, multiplies the spectrum by that mask (zeroing out all energy outside the passband), then recovers the time-domain signal with ifft. This is the most direct application of the convolution theorem: multiplication in the frequency domain equals convolution with a rectangular (ideal brick-wall) filter in the time domain. No windowing or overlap-add is used, so it treats the signal as one periodic block.
+### 
