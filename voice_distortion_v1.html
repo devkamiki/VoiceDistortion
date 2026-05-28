@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Voice Distortion Tool</title>
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f6f8;
+            color: #222;
+        }
+
+        .container {
+            width: 720px;
+            max-width: 90%;
+            margin: 60px auto;
+            padding: 35px;
+            background: white;
+            border-radius: 18px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+            text-align: center;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 34px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .upload-box {
+            margin: 25px 0;
+            padding: 25px;
+            border: 2px dashed #aaa;
+            border-radius: 14px;
+            background: #fafafa;
+        }
+
+        input[type="file"] {
+            margin-top: 15px;
+        }
+
+        .button-group {
+            margin: 25px 0;
+        }
+
+        button {
+            padding: 11px 18px;
+            margin: 7px;
+            font-size: 15px;
+            border: none;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #1d4ed8;
+        }
+
+        button.secondary {
+            background: #555;
+        }
+
+        button.secondary:hover {
+            background: #333;
+        }
+
+        button.effect {
+            background: #7c3aed;
+        }
+
+        button.effect:hover {
+            background: #5b21b6;
+        }
+
+        audio {
+            width: 90%;
+            margin-top: 18px;
+        }
+
+        .status {
+            margin-top: 18px;
+            color: #444;
+            font-size: 14px;
+        }
+
+        .download-link {
+            display: inline-block;
+            margin-top: 20px;
+            text-decoration: none;
+            padding: 10px 18px;
+            background: #16a34a;
+            color: white;
+            border-radius: 8px;
+        }
+
+        .download-link:hover {
+            background: #15803d;
+        }
+
+        .section-title {
+            margin-top: 30px;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .note {
+            margin-top: 20px;
+            font-size: 13px;
+            color: #777;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+    <h1>🎙️ Voice Distortion Tool</h1>
+    <p class="subtitle">
+        Upload a voice recording, convert it to WAV, and apply signal-processing effects.
+    </p>
+
+    <div class="upload-box">
+        <strong>Upload Audio File</strong>
+        <br>
+        <input type="file" id="audioInput" accept=".mp3,.wav,.m4a,audio/*">
+    </div>
+
+    <div class="button-group">
+        <button class="secondary" id="playOriginalBtn">Play Original</button>
+        <button class="secondary" id="playProcessedBtn">Play Processed</button>
+    </div>
+
+    <div class="section-title">Voice Effects</div>
+
+    <div class="button-group">
+        <button class="effect" id="roboticBtn">Robotic</button>
+        <button class="effect" id="eqBtn">Graphic Equalizer</button>
+        <button class="effect" id="filterBtn">Band-pass Filter</button>
+    </div>
+
+    <audio id="audioPlayer" controls></audio>
+
+    <div class="status" id="statusText">No file uploaded.</div>
+
+    <a id="downloadLink" class="download-link" style="display:none;" download="processed_voice.wav">
+        Download Processed WAV
+    </a>
+
+    <p class="note">
+        Supported formats: MP3, WAV, M4A, depending on browser support.
+        Uploaded audio is decoded into samples, processed, and exported as WAV.
+    </p>
+</div>
+
+
+<script type="module">
+    import FFT from "https://cdn.jsdelivr.net/npm/fft.js@4.0.4/+esm";
+
+    let audioContext = null;
+
+    let originalBuffer = null;
+    let processedBuffer = null;
+
+    let originalWavBlob = null;
+    let processedWavBlob = null;
+
+    const audioInput = document.getElementById("audioInput");
+    const audioPlayer = document.getElementById("audioPlayer");
+    const statusText = document.getElementById("statusText");
+    const downloadLink = document.getElementById("downloadLink");
+
+    const playOriginalBtn = document.getElementById("playOriginalBtn");
+    const playProcessedBtn = document.getElementById("playProcessedBtn");
+
+    const roboticBtn = document.getElementById("roboticBtn");
+    const eqBtn = document.getElementById("eqBtn");
+    const filterBtn = document.getElementById("filterBtn");
+
+    audioInput.addEventListener("change", handleFileUpload);
+
+    playOriginalBtn.addEventListener("click", playOriginal);
+    playProcessedBtn.addEventListener("click", playProcessed);
+
+    roboticBtn.addEventListener("click", () => applyEffect("robotic"));
+    eqBtn.addEventListener("click", () => applyEffect("eq"));
+    filterBtn.addEventListener("click", () => applyEffect("filter"));
+
+
+    async function handleFileUpload(event) {
+        const file = event.target.files[0];
+
+        if (!file) {
+            statusText.textContent = "No file selected.";
+            return;
+        }
+
+        statusText.textContent = "Loading and decoding audio...";
+
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        const arrayBuffer = await file.arrayBuffer();
+
+        try {
+            originalBuffer = await audioContext.decodeAudioData(arrayBuffer);
+
+            originalWavBlob = audioBufferToWavBlob(originalBuffer);
+
+            processedBuffer = cloneAudioBuffer(originalBuffer);
+            processedWavBlob = audioBufferToWavBlob(processedBuffer);
+
+            audioPlayer.src = URL.createObjectURL(originalWavBlob);
+
+            downloadLink.href = URL.createObjectURL(processedWavBlob);
+            downloadLink.style.display = "inline-block";
+
+            statusText.textContent = "Audio uploaded and converted to WAV successfully.";
+        } catch (error) {
+            console.error(error);
+            statusText.textContent = "Error: This audio format may not be supported by your browser.";
+        }
+    }
+
+
+    function playOriginal() {
+        if (!originalWavBlob) {
+            statusText.textContent = "Please upload an audio file first.";
+            return;
+        }
+
+        audioPlayer.src = URL.createObjectURL(originalWavBlob);
+        audioPlayer.play();
+        statusText.textContent = "Playing original audio.";
+    }
+
+
+    function playProcessed() {
+        if (!processedWavBlob) {
+            statusText.textContent = "Please apply an effect first.";
+            return;
+        }
+
+        audioPlayer.src = URL.createObjectURL(processedWavBlob);
+        audioPlayer.play();
+        statusText.textContent = "Playing processed audio.";
+    }
+
+
+    function applyEffect(effectName) {
+        if (!originalBuffer) {
+            statusText.textContent = "Please upload an audio file first.";
+            return;
+        }
+
+        let outputBuffer;
+
+        if (effectName === "robotic") {
+            statusText.textContent = "Applying robotic effect...";
+            outputBuffer = roboticEffect(originalBuffer);
+            statusText.textContent = "Robotic effect applied.";
+        }
+
+        else if (effectName === "eq") {
+            statusText.textContent = "Applying graphic equalizer...";
+            outputBuffer = graphicEqualizerEffect(originalBuffer);
+            statusText.textContent = "Graphic equalizer applied.";
+        }
+
+        else if (effectName === "filter") {
+            statusText.textContent = "Applying band-pass filter...";
+            outputBuffer = bandpassFilterEffect(originalBuffer);
+            statusText.textContent = "Band-pass filter applied.";
+        }
+
+        processedBuffer = outputBuffer;
+        processedWavBlob = audioBufferToWavBlob(processedBuffer);
+
+        const processedURL = URL.createObjectURL(processedWavBlob);
+
+        audioPlayer.src = processedURL;
+        downloadLink.href = processedURL;
+        downloadLink.style.display = "inline-block";
+    }
+
+
+    // ============================================================
+    // EFFECT 1: ROBOTIC VOICE
+    // Based on your FFT frame-processing robotic code
+    // ============================================================
+
+    function roboticEffect(inputAudioBuffer) {
+        const fs = inputAudioBuffer.sampleRate;
+
+        let audio = inputAudioBuffer.getChannelData(0);
+        audio = normalizeArray(audio);
+
+        const windowSize = 1024;
+        const hopSize = windowSize / 4;
+
+        const shiftAmount = 0.001;
+        const phaseRand = 0.3;
+
+        const phaseMode = "zero";
+        // const phaseMode = "random";
+
+        const numWindows = Math.floor((audio.length - windowSize) / hopSize) + 1;
+
+        const output = new Float32Array(audio.length);
+
+        const win = hammingWindow(windowSize);
+        const fft = new FFT(windowSize);
+
+        for (let i = 0; i < numWindows; i++) {
+            const startIdx = i * hopSize;
+
+            const frameWindowed = new Float32Array(windowSize);
+
+            for (let n = 0; n < windowSize; n++) {
+                frameWindowed[n] = audio[startIdx + n] * win[n];
+            }
+
+            const inputComplex = fft.createComplexArray();
+
+            for (let n = 0; n < windowSize; n++) {
+                inputComplex[2 * n] = frameWindowed[n];
+                inputComplex[2 * n + 1] = 0;
+            }
+
+            const spectrum = fft.createComplexArray();
+            fft.transform(spectrum, inputComplex);
+
+            const shift = Math.round(windowSize * shiftAmount);
+            const shiftedSpectrum = fft.createComplexArray();
+
+            for (let k = 0; k < windowSize; k++) {
+                const sourceIndex = k + shift;
+
+                if (sourceIndex < windowSize) {
+                    shiftedSpectrum[2 * k] = spectrum[2 * sourceIndex];
+                    shiftedSpectrum[2 * k + 1] = spectrum[2 * sourceIndex + 1];
+                } else {
+                    shiftedSpectrum[2 * k] = 0;
+                    shiftedSpectrum[2 * k + 1] = 0;
+                }
+            }
+
+            const robotSpectrum = fft.createComplexArray();
+
+            for (let k = 0; k < windowSize; k++) {
+                const re = shiftedSpectrum[2 * k];
+                const im = shiftedSpectrum[2 * k + 1];
+
+                const magnitude = Math.sqrt(re * re + im * im);
+                let phase;
+
+                if (phaseMode === "random") {
+                    const originalPhase = Math.atan2(im, re);
+                    const randomOffset = (Math.random() - 0.5) * phaseRand;
+                    phase = originalPhase + randomOffset;
+                } else {
+                    phase = 0;
+                }
+
+                robotSpectrum[2 * k] = magnitude * Math.cos(phase);
+                robotSpectrum[2 * k + 1] = magnitude * Math.sin(phase);
+            }
+
+            const inverse = fft.createComplexArray();
+            fft.inverseTransform(inverse, robotSpectrum);
+
+            for (let n = 0; n < windowSize; n++) {
+                const frameOut = inverse[2 * n] * win[n];
+                output[startIdx + n] += frameOut;
+            }
+        }
+
+        const normalizedOutput = normalizeArray(output);
+
+        return createMonoAudioBuffer(normalizedOutput, fs);
+    }
+
+
+    // ============================================================
+    // EFFECT 2: GRAPHIC EQUALIZER
+    // Based on your MATLAB/JS EQ code
+    // ============================================================
+
+    function graphicEqualizerEffect(inputAudioBuffer) {
+        const fs = inputAudioBuffer.sampleRate;
+
+        let audio = inputAudioBuffer.getChannelData(0);
+        audio = normalizeArray(audio);
+
+        const windowSize = 1024;
+        const hopSize = windowSize / 4;
+
+        const lowGain = 1.5;
+        const midGain = 1.0;
+        const highGain = 0.6;
+
+        const numWindows = Math.floor((audio.length - windowSize) / hopSize) + 1;
+
+        const output = new Float32Array(audio.length);
+
+        const fft = new FFT(windowSize);
+        const win = hammingWindow(windowSize);
+
+        for (let i = 0; i < numWindows; i++) {
+            const startIdx = i * hopSize;
+
+            const inputComplex = fft.createComplexArray();
+
+            for (let n = 0; n < windowSize; n++) {
+                const sample = audio[startIdx + n] * win[n];
+
+                inputComplex[2 * n] = sample;
+                inputComplex[2 * n + 1] = 0;
+            }
+
+            const spectrum = fft.createComplexArray();
+            fft.transform(spectrum, inputComplex);
+
+            const N = windowSize;
+
+            const lowEnd = Math.floor(N * 0.2);
+            const midEnd = Math.floor(N * 0.6);
+
+            for (let k = 0; k < N; k++) {
+                let gain;
+
+                if (k < lowEnd) {
+                    gain = lowGain;
+                } else if (k < midEnd) {
+                    gain = midGain;
+                } else {
+                    gain = highGain;
+                }
+
+                spectrum[2 * k] *= gain;
+                spectrum[2 * k + 1] *= gain;
+            }
+
+            const inverse = fft.createComplexArray();
+            fft.inverseTransform(inverse, spectrum);
+
+            for (let n = 0; n < windowSize; n++) {
+                const frameOut = inverse[2 * n] * win[n];
+                output[startIdx + n] += frameOut;
+            }
+        }
+
+        const normalizedOutput = normalizeArray(output);
+
+        return createMonoAudioBuffer(normalizedOutput, fs);
+    }
+
+
+    // ============================================================
+    // EFFECT 3: BAND-PASS FILTER
+    // Based on your FFT band-pass filter code
+    // ============================================================
+
+    function bandpassFilterEffect(inputAudioBuffer) {
+        const fs = inputAudioBuffer.sampleRate;
+
+        const originalAudio = inputAudioBuffer.getChannelData(0);
+        const originalLength = originalAudio.length;
+
+        const cutoffLow = 300;
+        const cutoffHigh = 3000;
+
+        const N = nextPowerOfTwo(originalLength);
+
+        const fft = new FFT(N);
+        const input = fft.createComplexArray();
+
+        for (let i = 0; i < N; i++) {
+            if (i < originalLength) {
+                input[2 * i] = originalAudio[i];
+                input[2 * i + 1] = 0;
+            } else {
+                input[2 * i] = 0;
+                input[2 * i + 1] = 0;
+            }
+        }
+
+        const spectrum = fft.createComplexArray();
+        fft.transform(spectrum, input);
+
+        for (let k = 0; k < N; k++) {
+            let frequency;
+
+            if (k <= N / 2) {
+                frequency = k * fs / N;
+            } else {
+                frequency = -(N - k) * fs / N;
+            }
+
+            const absFrequency = Math.abs(frequency);
+
+            let gain = 0;
+
+            if (absFrequency >= cutoffLow && absFrequency <= cutoffHigh) {
+                gain = 1;
+            }
+
+            spectrum[2 * k] *= gain;
+            spectrum[2 * k + 1] *= gain;
+        }
+
+        const inverse = fft.createComplexArray();
+        fft.inverseTransform(inverse, spectrum);
+
+        const filteredAudio = new Float32Array(originalLength);
+
+        for (let i = 0; i < originalLength; i++) {
+            filteredAudio[i] = inverse[2 * i];
+        }
+
+        const normalizedOutput = normalizeArray(filteredAudio);
+
+        return createMonoAudioBuffer(normalizedOutput, fs);
+    }
+
+
+    // ============================================================
+    // HELPER FUNCTIONS
+    // ============================================================
+
+    function hammingWindow(N) {
+        const win = new Float32Array(N);
+
+        for (let n = 0; n < N; n++) {
+            win[n] = 0.54 - 0.46 * Math.cos((2 * Math.PI * n) / (N - 1));
+        }
+
+        return win;
+    }
+
+
+    function normalizeArray(input) {
+        let maxVal = 0;
+
+        for (let i = 0; i < input.length; i++) {
+            const absVal = Math.abs(input[i]);
+
+            if (absVal > maxVal) {
+                maxVal = absVal;
+            }
+        }
+
+        const output = new Float32Array(input.length);
+
+        if (maxVal === 0) {
+            return output;
+        }
+
+        for (let i = 0; i < input.length; i++) {
+            output[i] = input[i] / maxVal;
+        }
+
+        return output;
+    }
+
+
+    function nextPowerOfTwo(n) {
+        return Math.pow(2, Math.ceil(Math.log2(n)));
+    }
+
+
+    function cloneAudioBuffer(buffer) {
+        const newBuffer = audioContext.createBuffer(
+            buffer.numberOfChannels,
+            buffer.length,
+            buffer.sampleRate
+        );
+
+        for (let ch = 0; ch < buffer.numberOfChannels; ch++) {
+            newBuffer.copyToChannel(buffer.getChannelData(ch), ch);
+        }
+
+        return newBuffer;
+    }
+
+
+    function createMonoAudioBuffer(floatArray, sampleRate) {
+        const newBuffer = audioContext.createBuffer(
+            1,
+            floatArray.length,
+            sampleRate
+        );
+
+        newBuffer.getChannelData(0).set(floatArray);
+
+        return newBuffer;
+    }
+
+
+    function audioBufferToWavBlob(audioBuffer) {
+        const numberOfChannels = audioBuffer.numberOfChannels;
+        const sampleRate = audioBuffer.sampleRate;
+
+        const length = audioBuffer.length * numberOfChannels * 2;
+        const buffer = new ArrayBuffer(44 + length);
+        const view = new DataView(buffer);
+
+        writeString(view, 0, "RIFF");
+        view.setUint32(4, 36 + length, true);
+        writeString(view, 8, "WAVE");
+
+        writeString(view, 12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, numberOfChannels, true);
+        view.setUint32(24, sampleRate, true);
+        view.setUint32(28, sampleRate * numberOfChannels * 2, true);
+        view.setUint16(32, numberOfChannels * 2, true);
+        view.setUint16(34, 16, true);
+
+        writeString(view, 36, "data");
+        view.setUint32(40, length, true);
+
+        let offset = 44;
+
+        for (let i = 0; i < audioBuffer.length; i++) {
+            for (let ch = 0; ch < numberOfChannels; ch++) {
+                let sample = audioBuffer.getChannelData(ch)[i];
+
+                sample = Math.max(-1, Math.min(1, sample));
+
+                const intSample = sample < 0
+                    ? sample * 0x8000
+                    : sample * 0x7FFF;
+
+                view.setInt16(offset, intSample, true);
+                offset += 2;
+            }
+        }
+
+        return new Blob([view], { type: "audio/wav" });
+    }
+
+
+    function writeString(view, offset, string) {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    }
+</script>
+
+</body>
+</html>
