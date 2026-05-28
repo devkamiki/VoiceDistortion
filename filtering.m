@@ -1,5 +1,5 @@
 clear; close all; clc;
-inputFile = 'outputs/noiseReduced.wav';  % Path to your input noise-reduced audio file
+inputFile = 'inputfiles/music-sample.wav';  % Path to your input noise-reduced audio file
 cutoffLow = 300;   % Hz
 cutoffHigh = 3000; % Hz
 [audio, fs] = audioread(inputFile);
