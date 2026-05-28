@@ -1,6 +1,9 @@
-clear; close all;
+function [outputSignal, Fs] = roboticdistortion(inputFile)
+if nargin < 1
+    inputFile = 'inputfiles/singing-sample.wav';  % fallback
+end
 
-inputFile = 'inputfiles/voice-sample.wav';  % Path to your input noise-reduced audio file
+
 
 [audio, fs] = audioread(inputFile); 
 audio = audio(:,1);  
@@ -46,3 +49,8 @@ output = output / max(abs(output));
 sound(output, fs);
 % Save output
 audiowrite('outputs/robotic_voice.wav', output, fs);
+
+
+outputSignal = audioread('outputs/robotic_voice.wav');   
+[~, Fs] = audioread(inputFile);   
+end

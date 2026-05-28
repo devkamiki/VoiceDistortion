@@ -3,7 +3,7 @@ if nargin < 1
     inputFile = 'inputfiles/singing-sample.wav';  % fallback
 end
 
-
+outputFile = 'outputs/chorus_warm_thick.wav';
 % Small pitch detune for natural thick chorus
 pitchShifts = [-9,-8, -0.22, -0.10, 0, 0.10, 0.22, 0.35];   % semitones
 
@@ -201,28 +201,6 @@ function y = makeWarmAndThick(x, fs)
 
 end
 
-
-if ~exist('outputSignal', 'var')
-    if exist('processed', 'var')          
-        outputSignal = processed;
-    elseif exist('y_out', 'var')
-        outputSignal = y_out;
-    elseif exist('output', 'var')
-        outputSignal = output;
-    else
-        
-        vars = whos;
-        for i = 1:length(vars)
-            if contains(vars(i).name, {'out','processed','y','signal','audio'}, 'IgnoreCase',true)
-                outputSignal = eval(vars(i).name);
-                break;
-            end
-        end
-    end
+outputSignal = audioread('outputs/chorus.wav');   
+[~, Fs] = audioread(inputFile);   
 end
-
-if ~exist('Fs', 'var') && exist('fs', 'var')
-    Fs = fs;
-end
-
-end  

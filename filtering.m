@@ -1,5 +1,8 @@
-clear; close all; clc;
-inputFile = 'inputfiles/music-sample.wav';  % Path to your input noise-reduced audio file
+function [outputSignal, Fs] = filtering(inputFile)
+if nargin < 1
+    inputFile = 'inputfiles/music-sample.wav';  % fallback
+end
+
 cutoffLow = 300;   % Hz
 cutoffHigh = 3000; % Hz
 [audio, fs] = audioread(inputFile);
@@ -14,3 +17,7 @@ audio_filtered = real(ifft(X_filtered));
 audio_filtered = audio_filtered / max(abs(audio_filtered));
 sound(audio_filtered, fs);
 audiowrite('outputs/filtered.wav', audio_filtered, fs);
+
+outputSignal = audioread('outputs/filtered.wav');   
+[~, Fs] = audioread(inputFile);   
+end

@@ -1,6 +1,7 @@
-clear; close all;
-
-inputFile = fullfile('inputfiles', 'music-sample.wav');
+function [outputSignal, Fs] = graphicEqualizer(inputFile)
+if nargin < 1
+    inputFile = 'inputfiles/music-sample.wav';  % fallback
+end
 
 [audio, fs] = audioread(inputFile);
 audio = audio(:,1);
@@ -72,3 +73,8 @@ sound(output, fs);
 
 % Save
 audiowrite('outputs/equalized_voice.wav', output, fs);
+
+
+outputSignal = audioread('outputs/equalized_voice.wav');   
+[~, Fs] = audioread(inputFile);   
+end
