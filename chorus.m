@@ -1,11 +1,9 @@
 clear; close all; clc;
 
-inputFile = 'inputfiles/singingm4a-sample.wav';
+inputFile = 'inputfiles/singing-sample.wav';
 outputFile = 'outputs/chorus_warm_thick2.wav';
 
-% ============================================================
-% USER SETTINGS
-% ============================================================
+
 
 % Small pitch detune for natural thick chorus
 pitchShifts = [-9,-8, -0.22, -0.10, 0, 0.10, 0.22, 0.35];   % semitones
