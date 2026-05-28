@@ -40,29 +40,9 @@ switch targetStyle
 
     case "feminine"
 
-        % Estimate original median fundamental frequency
-        medianF0 = estimateMedianF0(x, fs);
+        pitchShiftSemitones = 2.0;
 
-        % Target feminine-style range.
-        % Do not make this too high, otherwise it becomes robotic.
-        targetF0 = 205;   % Hz, smoother than 220 or 240
-
-        % Calculate required pitch shift
-        pitchShiftSemitones = 12 * log2(targetF0 / medianF0);
-
-        % Limit upward shift for smoothness
-        % For male-to-feminine, too much upward shift creates robotic artifacts.
-        pitchShiftSemitones = max(min(pitchShiftSemitones, 5.5), 1.5);
-
-        % Gentle formant raising
-        % Larger denominator = gentler formant movement
-        formantScale = 2^(pitchShiftSemitones / 40);
-
-        % Keep formant scale in a safe range
-        formantScale = max(min(formantScale, 1.14), 1.04);
-
-        fprintf('Estimated median F0: %.2f Hz\n', medianF0);
-        fprintf('Target F0: %.2f Hz\n', targetF0);
+        formantScale = 1.06;
 
     case "masculine"
 
