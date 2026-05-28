@@ -1,0 +1,241 @@
+clear; close all; clc;
+
+inputFile = 'inputfiles/singing-sample.wav';
+outputFile = 'outputs/chorus_natural_convolution.wav';
+
+% ============================================================
+% USER SETTINGS
+% ============================================================
+
+% Manually define pitch shifts
+% The number of pitch shifts determines number of voices
+pitchShifts = [-8, -6, -4, -2, 0, 8];   % semitones
+numVoices = length(pitchShifts);
+
+% Random delay range for chorus voices
+minDelay = 0.0;      % seconds
+maxDelay = 0.05;      % seconds
+
+% Generate random delays with same number as pitch shifts
+delays = minDelay + (maxDelay - minDelay) * rand(numVoices, 1);
+
+% Quantize delays to group similar delay values
+binSize = 0.005;     % 5 ms resolution
+delayBins = round(delays / binSize);
+
+% Count repeated or similar delays
+[uniqueBins, ~, idx] = unique(delayBins);
+counts = accumarray(idx, 1);
+
+% STFT parameters for pitch shifting
+windowLength = 1024;
+overlap = round(0.75 * windowLength);
+
+% Convolution naturalization settings
+reverbTime = 0.45;       % seconds, room decay length
+wetMix = 0.25;           % amount of convolved signal
+dryMix = 0.75;           % amount of original chorus signal
+
+% ============================================================
+% READ AUDIO
+% ============================================================
+
+[x, fs] = audioread(inputFile);
+
+% Convert stereo to mono if needed
+if size(x, 2) > 1
+    x = mean(x, 2);
+end
+
+x = x(:);
+
+% Output chorus signal
+y = zeros(size(x));
+
+% ============================================================
+% SHOW RANDOM DELAY LIST
+% ============================================================
+
+fprintf('\n========== RANDOM DELAY LIST ==========\n');
+fprintf('Sampling frequency: %d Hz\n', fs);
+fprintf('Number of voices: %d\n', numVoices);
+fprintf('Delay range: %.3f s to %.3f s\n\n', minDelay, maxDelay);
+
+delayTable = table((1:numVoices)', pitchShifts(:), delays(:), ...
+    round(delays(:) * fs), delayBins(:), ...
+    'VariableNames', {'Voice', 'PitchShift_semitones', ...
+    'Delay_seconds', 'Delay_samples', 'DelayBin'});
+
+disp(delayTable);
+
+% ============================================================
+% CHORUS PROCESSING
+% ============================================================
+
+for v = 1:numVoices
+
+    ps = pitchShifts(v);
+    dl = delays(v);
+
+    % Find how many voices share same delay bin
+    binIndex = find(uniqueBins == delayBins(v));
+    weight = counts(binIndex);
+
+    fprintf('Voice %d | shift = %.2f st | delay = %.4f s | delay samples = %d | weight = %d\n', ...
+            v, ps, dl, round(dl * fs), weight);
+
+    % Pitch shift current voice
+    shifted = pitchShift(x, fs, ps, windowLength, overlap);
+
+    % Convert delay seconds to samples using the SAME fs
+    delaySamples = round(dl * fs);
+
+    % Apply delay while keeping same signal length
+    if delaySamples >= 0
+        delayed = [zeros(delaySamples, 1); shifted(1:end-delaySamples)];
+    else
+        delayed = [shifted(-delaySamples+1:end); zeros(-delaySamples, 1)];
+    end
+
+    % Add voice to chorus mixture
+    y = y + (weight * delayed) / numVoices;
+
+end
+
+% Normalize chorus before convolution
+y = y / max(abs(y) + eps) * 0.95;
+
+% ============================================================
+% CONVOLUTION NATURALIZATION
+% ============================================================
+
+% Create a synthetic room impulse response using same sampling frequency
+h = createNaturalImpulseResponse(fs, reverbTime);
+
+% Convolve chorus with impulse response
+y_conv = conv(y, h, 'same');
+
+% Mix original chorus and convolved signal
+y_natural = dryMix * y + wetMix * y_conv;
+
+% Final normalization
+y_natural = y_natural / max(abs(y_natural) + eps) * 0.95;
+
+% ============================================================
+% SAVE AND PLAY
+% ============================================================
+
+audiowrite(outputFile, y_natural, fs);
+sound(y_natural, fs);
+
+fprintf('\nOutput saved to: %s\n', outputFile);
+
+% ============================================================
+% PITCH SHIFT FUNCTION
+% ============================================================
+
+function y = pitchShift(x, fs, semitones, windowLength, overlap)
+
+    if nargin < 5
+        overlap = round(0.75 * windowLength);
+    end
+
+    hop = windowLength - overlap;
+
+    % Pitch shift ratio
+    alpha = 2^(semitones / 12);
+
+    % STFT
+    win = hamming(windowLength, 'periodic');
+
+    [S, F, ~] = stft(x, fs, ...
+        'Window', win, ...
+        'OverlapLength', overlap, ...
+        'FFTLength', windowLength, ...
+        'Centered', false);
+
+    % Phase processing
+    numFrames = size(S, 2);
+    phi = zeros(size(S));
+    phi(:, 1) = angle(S(:, 1));
+
+    for n = 2:numFrames
+
+        delta_phi_ana = 2 * pi * F * hop / fs;
+
+        delta_phi = angle(S(:, n)) - angle(S(:, n-1)) - delta_phi_ana;
+
+        % Wrap phase
+        delta_phi = delta_phi - 2 * pi * round(delta_phi / (2 * pi));
+
+        % Synthesis phase update
+        delta_phi_syn = delta_phi * alpha + ...
+                        2 * pi * F * hop * (alpha - 1) / fs;
+
+        phi(:, n) = phi(:, n-1) + delta_phi_syn;
+    end
+
+    % Reconstruct complex spectrum
+    Y = abs(S) .* exp(1i * phi);
+
+    % ISTFT
+    y = istft(Y, fs, ...
+        'Window', win, ...
+        'OverlapLength', overlap, ...
+        'FFTLength', windowLength, ...
+        'Centered', false);
+
+    % Match original length
+    originalLength = length(x);
+
+    if length(y) > originalLength
+        y = y(1:originalLength);
+    elseif length(y) < originalLength
+        y = [y; zeros(originalLength - length(y), 1)];
+    end
+
+    y = real(y);
+
+end
+
+% ============================================================
+% SYNTHETIC IMPULSE RESPONSE FUNCTION
+% ============================================================
+
+function h = createNaturalImpulseResponse(fs, reverbTime)
+
+    % Length of impulse response in samples
+    irLength = round(reverbTime * fs);
+
+    % Time vector
+    t = (0:irLength-1)' / fs;
+
+    % Exponential decay envelope
+    decay = exp(-6 * t / reverbTime);
+
+    % Random noise tail for diffuse room reflections
+    noiseTail = randn(irLength, 1) .* decay;
+
+    % Add direct sound
+    h = zeros(irLength, 1);
+    h(1) = 1;
+
+    % Add early reflections
+    earlyReflectionTimes = [0.012, 0.024, 0.037, 0.051];  % seconds
+    earlyReflectionGains = [0.45, 0.32, 0.24, 0.18];
+
+    for k = 1:length(earlyReflectionTimes)
+        idx = round(earlyReflectionTimes(k) * fs) + 1;
+
+        if idx <= irLength
+            h(idx) = h(idx) + earlyReflectionGains(k);
+        end
+    end
+
+    % Add diffuse reverb tail
+    h = h + 0.08 * noiseTail;
+
+    % Normalize impulse response
+    h = h / max(abs(h) + eps);
+
+end
