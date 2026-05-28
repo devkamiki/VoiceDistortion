@@ -7,8 +7,8 @@ clear; close all; clc;
 %to the right in case better see the differences.
 
 % ---------- Load two audio files ----------
-Inputfile = fullfile('inputfiles', 'singingm4a-sample.wav');
-Outputfile = fullfile('outputs', 'chorus.wav');
+Inputfile = fullfile('inputfiles', 'singing-sample.wav');
+Outputfile = fullfile('outputs', 'chorus_warm_thick.wav');
 
 [x1, fs1] = audioread(Inputfile);       % Signal 1
 [x2, fs2] = audioread(Outputfile);     % Signal 2

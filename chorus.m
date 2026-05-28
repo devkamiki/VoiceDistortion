@@ -8,11 +8,11 @@ outputFile = 'outputs/chorus_warm_thick.wav';
 % ============================================================
 
 % Small pitch detune for natural thick chorus
-pitchShifts = [-0.35, -0.22, -0.10, 0, 0.10, 0.22, 0.35];   % semitones
+pitchShifts = [-9,-8, -0.22, -0.10, 0, 0.10, 0.22, 0.35];   % semitones
 
 % Manual delays, same number as pitchShifts
 % Avoid 0 second delay to reduce comb filtering
-delays = [0.008, 0.012, 0.016, 0.020, 0.024, 0.028, 0.032];  % seconds
+delays = [0.008, 0.012, 0.016, 0.020, 0.024, 0.028, 0.032, 0.036];  % seconds
 
 numVoices = length(pitchShifts);
 
