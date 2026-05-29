@@ -1,6 +1,6 @@
 function [outputSignal, Fs] = chorusOrig(inputFile)
 if nargin < 1
-    inputFile = 'inputfiles/singingm4a-sample.wav';
+    inputFile = 'inputfiles/singing2.wav';
 end
 
 outputFile = 'outputs/chorusOrig.wav';
