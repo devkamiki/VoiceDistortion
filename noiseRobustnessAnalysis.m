@@ -10,8 +10,9 @@ function noiseRobustnessAnalysis()
         struct('name','Robotic',  'func',@roboticdistortion, 'input','inputfiles/voice-sample.wav'), ...
         struct('name','Equalizer','func',@graphicEqualizer,  'input','inputfiles/music-sample.wav'), ...
         struct('name','Filter',   'func',@filtering,         'input','inputfiles/music-sample.wav'), ...
-        struct('name','Chorus',   'func',@chorusOrig,        'input','inputfiles/singingm4a-sample.wav') ...
-        struct('name','Gender',   'func',@Gender_style_conversion,        'input','inputfiles/singingm4a-sample.wav') ...
+        struct('name','Chorus',   'func',@chorusOrig,                                          'input','inputfiles/singingm4a-sample.wav'), ...
+        struct('name','GenderF',  'func',@(f) Gender_style_conversion(f, "feminine"),          'input','inputfiles/voice-sample.wav'), ...
+        struct('name','GenderM',  'func',@(f) Gender_style_conversion(f, "masculine"),         'input','inputfiles/voice-sample.wav') ...
     };
 
     for t = 1:length(tests)
@@ -35,8 +36,9 @@ function noiseRobustnessAnalysis()
         Y_cleanOut = abs(fft(cleanProc, N));
 
         fig = figure('Position', [100 100 1000 600], 'Visible', 'off');
-        plot(freq, 20*log10(Y_cleanOut(half)/max(Y_cleanOut)+eps), 'k', 'LineWidth', 1.5);
-        hold on;
+        ax = axes('Parent', fig);
+        plot(ax, freq, 20*log10(Y_cleanOut(half)/max(Y_cleanOut)+eps), 'k', 'LineWidth', 1.5);
+        hold(ax, 'on');
         legendEntries = {'Clean'};
 
         for i = 1:length(snrLevels)
@@ -57,13 +59,13 @@ function noiseRobustnessAnalysis()
             outSNR = 10*log10(sum(cp.^2) / (sum((cp - np).^2) + eps));
             fprintf('  Input SNR=%2d dB | Output SNR=%6.2f dB\n', snrIn, outSNR);
 
-            plot(freq, 20*log10(Y_noisyOut(half)/max(Y_noisyOut)+eps), 'LineWidth', 1);
+            plot(ax, freq, 20*log10(Y_noisyOut(half)/max(Y_noisyOut)+eps), 'LineWidth', 1);
             legendEntries{end+1} = sprintf('SNR_{in}=%d dB', snrIn); %#ok<AGROW>
         end
 
-        title(sprintf('%s - output freq spectrum with regard of frequency domain', test.name));
-        xlabel('Frequency (Hz)'); ylabel('Magnitude (dB)');
-        legend(legendEntries); grid on; xlim([0 Fs/2]); ylim([-80 5]);
+        title(ax, sprintf('%s - output freq spectrum with regard of frequency domain', test.name));
+        xlabel(ax, 'Frequency (Hz)'); ylabel(ax, 'Magnitude (dB)');
+        legend(ax, legendEntries); grid(ax, 'on'); xlim(ax, [0 Fs/2]); ylim(ax, [-80 5]);
         saveas(fig, fullfile(outputDir, sprintf('%s.png', test.name)));
         close(fig);
     end
