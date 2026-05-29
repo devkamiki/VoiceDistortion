@@ -1,24 +1,16 @@
-clear; close all; clc;
+function [outputSignal, Fs] = Gender_style_conversion(inputFile, targetStyle)
+if nargin < 1
+    inputFile = 'inputfiles/voice-sample.wav';
+end
+if nargin < 2
+    targetStyle = "feminine";
+end
 
-% ============================================================
-% INPUT / OUTPUT
-% ============================================================
-
-inputFile = 'inputfiles/voice-sample.wav';
 outputFile = 'outputs/gender_style_smooth.wav';
-
-% Choose target style:
-% "feminine"  -> brighter / slightly higher
-% "masculine" -> deeper / warmer
-targetStyle = "feminine";
 
 if ~exist('outputs', 'dir')
     mkdir('outputs');
 end
-
-% ============================================================
-% READ AUDIO
-% ============================================================
 
 [x, fs] = audioread(inputFile);
 
@@ -32,33 +24,20 @@ x = x / max(abs(x) + eps);
 fprintf('Input duration: %.2f seconds\n', length(x) / fs);
 fprintf('Sampling rate: %d Hz\n', fs);
 
-% ============================================================
-% PARAMETERS
-% ============================================================
 
 switch targetStyle
 
     case "feminine"
-
         pitchShiftSemitones = 2.0;
         formantScale = 1.06;
 
     case "masculine"
-
         medianF0 = estimateMedianF0(x, fs);
-
-        targetF0 = 145;   % safer than 135 Hz for smooth conversion
-
+        targetF0 = 145;
         pitchShiftSemitones = 12 * log2(targetF0 / medianF0);
-
-        % Limit downward shift for smoothness
         pitchShiftSemitones = max(min(pitchShiftSemitones, -1.5), -6.0);
-
-        % Gentle formant lowering
         formantScale = 2^(pitchShiftSemitones / 30);
-
         formantScale = max(min(formantScale, 0.97), 0.86);
-
         fprintf('Estimated median F0: %.2f Hz\n', medianF0);
         fprintf('Target F0: %.2f Hz\n', targetF0);
 
@@ -66,488 +45,230 @@ switch targetStyle
         error('targetStyle must be "feminine" or "masculine".');
 end
 
-% ============================================================
-% PROCESSING
-% ============================================================
-
-% Step 1: smoother pitch shifting
 y_pitch = smoothPitchShiftMultiStage(x, fs, pitchShiftSemitones);
+fprintf('After pitch shift: max = %.6f, RMS = %.6f\n', max(abs(y_pitch)), rms(y_pitch));
 
-fprintf('After pitch shift: max = %.6f, RMS = %.6f\n', ...
-    max(abs(y_pitch)), rms(y_pitch));
-
-% Step 2: smooth formant-style processing
 y_formant = smoothFormantStyle(y_pitch, fs, formantScale);
+fprintf('After formant style: max = %.6f, RMS = %.6f\n', max(abs(y_formant)), rms(y_formant));
 
-fprintf('After formant style: max = %.6f, RMS = %.6f\n', ...
-    max(abs(y_formant)), rms(y_formant));
-
-% Step 3: voice tone EQ
 y_final = smoothVoiceEQ(y_formant, fs, targetStyle);
-
-% Step 4: final smoothing to remove tiny clicks
 y_final = shortFadeInOut(y_final, fs, 0.015);
 
-% Normalize
 if max(abs(y_final)) < 1e-6
     error('Output is almost silent. Processing failed.');
 end
 
 y_final = y_final / max(abs(y_final) + eps) * 0.95;
 
-% ============================================================
-% SAVE AND PLAY
-% ============================================================
-
 audiowrite(outputFile, y_final, fs);
-sound(y_final, fs);
-
 fprintf('Output saved to: %s\n', outputFile);
 
-figure;
-subplot(2,1,1);
-plot(x);
-title('Original waveform');
+outputSignal = y_final;
+Fs = fs;
 
-subplot(2,1,2);
-plot(y_final);
-title('Smooth gender-style converted waveform');
-
-
-
-
-% ============================================================
-% FUNCTION 3: SMOOTH FORMANT STYLE
-% ============================================================
+end
 
 function y = smoothFormantStyle(x, fs, formantScale)
-
     x = x(:);
     N = length(x);
-
     windowLength = 2048;
     overlap = round(0.75 * windowLength);
-
     win = hamming(windowLength, 'periodic');
-
-    [S, ~, ~] = stft(x, fs, ...
-        'Window', win, ...
-        'OverlapLength', overlap, ...
-        'FFTLength', windowLength, ...
-        'Centered', false);
-
+    [S, ~, ~] = stft(x, fs, 'Window', win, 'OverlapLength', overlap, ...
+        'FFTLength', windowLength, 'Centered', false);
     mag = abs(S);
     phase = angle(S);
-
     numBins = size(S, 1);
     numFrames = size(S, 2);
-
     magNew = zeros(size(mag));
-
     binIndex = (1:numBins)';
     smoothBins = 55;
-
     for n = 1:numFrames
-
         currentMag = mag(:, n);
         logMag = log(currentMag + 1e-8);
-
-        % Smooth spectral envelope
         envelope = movmean(logMag, smoothBins);
-
-        % Fine detail keeps harmonic texture
         detail = logMag - envelope;
-
-        % Warp envelope gently
         sourceIndex = (binIndex - 1) / formantScale + 1;
-
-        % Clamp index to avoid extrapolation artifacts
         sourceIndex(sourceIndex < 1) = 1;
         sourceIndex(sourceIndex > numBins) = numBins;
-
         warpedEnvelope = interp1(binIndex, envelope, sourceIndex, 'linear');
-
-        newLogMag = warpedEnvelope + detail;
-
-        % Limit extreme spectral changes
-        gainLog = newLogMag - logMag;
-
-        maxBoost = log(1.6);
-        maxCut = log(0.55);
-
-        gainLog = min(max(gainLog, maxCut), maxBoost);
-
-        stableLogMag = logMag + gainLog;
-
-        magNew(:, n) = exp(stableLogMag);
-
+        gainLog = min(max((warpedEnvelope + detail) - logMag, log(0.55)), log(1.6));
+        magNew(:, n) = exp(logMag + gainLog);
     end
-
     Y = magNew .* exp(1i * phase);
-
-    y = istft(Y, fs, ...
-        'Window', win, ...
-        'OverlapLength', overlap, ...
-        'FFTLength', windowLength, ...
-        'Centered', false);
-
+    y = istft(Y, fs, 'Window', win, 'OverlapLength', overlap, ...
+        'FFTLength', windowLength, 'Centered', false);
     y = matchLength(real(y), N);
-
 end
-
-% ============================================================
-% FUNCTION 4: SMOOTH VOICE EQ
-% ============================================================
 
 function y = smoothVoiceEQ(x, fs, targetStyle)
-
     x = x(:);
     N = length(x);
-
     X = fft(x);
-
     f = (0:N-1)' * fs / N;
     fMirror = min(f, fs - f);
-
     gain = ones(N, 1);
-
     switch targetStyle
-
         case "feminine"
-
-            % Reduce low rumble
             gain(fMirror < 90) = gain(fMirror < 90) * 0.75;
-
-            % Gentle clarity boost
-            gain(fMirror >= 2200 & fMirror <= 6000) = ...
-                gain(fMirror >= 2200 & fMirror <= 6000) * 1.08;
-
-            % Reduce harsh top end
+            gain(fMirror >= 2200 & fMirror <= 6000) = gain(fMirror >= 2200 & fMirror <= 6000) * 1.08;
             gain(fMirror > 9000) = gain(fMirror > 9000) * 0.88;
-
         case "masculine"
-
-            % Add body
-            gain(fMirror >= 90 & fMirror <= 280) = ...
-                gain(fMirror >= 90 & fMirror <= 280) * 1.30;
-
-            % Add warmth
-            gain(fMirror > 280 & fMirror <= 750) = ...
-                gain(fMirror > 280 & fMirror <= 750) * 1.15;
-
-            % Reduce nasal / sharp region slightly
-            gain(fMirror >= 1800 & fMirror <= 3500) = ...
-                gain(fMirror >= 1800 & fMirror <= 3500) * 0.90;
-
-            % Reduce high-frequency brightness
+            gain(fMirror >= 90  & fMirror <= 280)  = gain(fMirror >= 90  & fMirror <= 280)  * 1.30;
+            gain(fMirror > 280  & fMirror <= 750)  = gain(fMirror > 280  & fMirror <= 750)  * 1.15;
+            gain(fMirror >= 1800 & fMirror <= 3500) = gain(fMirror >= 1800 & fMirror <= 3500) * 0.90;
             gain(fMirror > 3500) = gain(fMirror > 3500) * 0.78;
-
-            % Remove rumble
-            gain(fMirror < 55) = gain(fMirror < 55) * 0.65;
+            gain(fMirror < 55)  = gain(fMirror < 55)  * 0.65;
     end
-
-    Y = X .* gain;
-    y = real(ifft(Y));
-
+    y = real(ifft(X .* gain));
 end
-
-% ============================================================
-% FUNCTION 5: SHORT FADE IN / OUT
-% ============================================================
 
 function y = shortFadeInOut(x, fs, fadeSeconds)
-
     y = x(:);
-    fadeLength = round(fadeSeconds * fs);
-    fadeLength = min(fadeLength, floor(length(y) / 2));
-
-    fadeIn = linspace(0, 1, fadeLength)';
-    fadeOut = linspace(1, 0, fadeLength)';
-
-    y(1:fadeLength) = y(1:fadeLength) .* fadeIn;
-    y(end-fadeLength+1:end) = y(end-fadeLength+1:end) .* fadeOut;
-
+    fadeLength = min(round(fadeSeconds * fs), floor(length(y) / 2));
+    y(1:fadeLength) = y(1:fadeLength) .* linspace(0, 1, fadeLength)';
+    y(end-fadeLength+1:end) = y(end-fadeLength+1:end) .* linspace(1, 0, fadeLength)';
 end
 
-% ============================================================
-% HELPER FUNCTION
-% ============================================================
-
 function y = matchLength(y, targetLength)
-
     y = y(:);
-
     if length(y) > targetLength
         y = y(1:targetLength);
     elseif length(y) < targetLength
         y = [y; zeros(targetLength - length(y), 1)];
     end
-
 end
 
 function medianF0 = estimateMedianF0(x, fs)
-
     x = x(:);
-
-    % Frame settings
-    frameLength = round(0.040 * fs);  % 40 ms
-    hop = round(0.010 * fs);          % 10 ms
-
-    minF0 = 80;     % Hz
-    maxF0 = 450;    % Hz
-
-    minLag = floor(fs / maxF0);
-    maxLag = ceil(fs / minF0);
-
+    frameLength = round(0.040 * fs);
+    hop = round(0.010 * fs);
+    minLag = floor(fs / 450);
+    maxLag = ceil(fs / 80);
     numFrames = floor((length(x) - frameLength) / hop) + 1;
-
     f0List = [];
-
     win = hamming(frameLength, 'periodic');
-
     for i = 1:numFrames
-
         startIdx = (i - 1) * hop + 1;
-        frame = x(startIdx:startIdx + frameLength - 1);
-        frame = frame .* win;
-
-        % Ignore very quiet frames
+        frame = x(startIdx:startIdx + frameLength - 1) .* win;
         if rms(frame) < 0.01 * rms(x)
             continue;
         end
-
-        % Autocorrelation
         r = xcorr(frame);
         r = r(frameLength:end);
-
-        searchRegion = r(minLag:maxLag);
-
-        [peakVal, peakIdx] = max(searchRegion);
-
-        % Confidence check
+        [peakVal, peakIdx] = max(r(minLag:maxLag));
         if peakVal > 0.25 * r(1)
-
             lag = peakIdx + minLag - 1;
             f0 = fs / lag;
-
-            if f0 >= minF0 && f0 <= maxF0
-                f0List(end+1, 1) = f0;
+            if f0 >= 80 && f0 <= 450
+                f0List(end+1, 1) = f0; %#ok<AGROW>
             end
         end
     end
-
     if isempty(f0List)
         warning('Could not estimate F0 reliably. Using fallback value 220 Hz.');
         medianF0 = 220;
     else
         medianF0 = median(f0List);
     end
-
 end
 
 function y = smoothPitchShiftMultiStage(x, fs, totalSemitones)
-
     x = x(:);
-
-    % Avoid extremely aggressive single-step shifting
-    maxStep = 1.5;
-
-    numStages = ceil(abs(totalSemitones) / maxStep);
-
-    if numStages < 1
-        numStages = 1;
-    end
-
+    numStages = max(1, ceil(abs(totalSemitones) / 1.5));
     stepShift = totalSemitones / numStages;
-
     y = x;
-
-    fprintf('Applying pitch shift in %d stages of %.2f semitones each\n', ...
-        numStages, stepShift);
-
+    fprintf('Applying pitch shift in %d stages of %.2f semitones each\n', numStages, stepShift);
     for s = 1:numStages
-
         y = smoothPitchShiftPV(y, fs, stepShift);
-
-        % Safety check after each stage
         if max(abs(y)) < 1e-7
-            warning('Stage %d produced nearly silent output. Falling back to previous signal.', s);
+            warning('Stage %d produced nearly silent output. Falling back.', s);
             y = x;
             break;
         end
-
         y = removeTinyClicksSafe(y, fs);
-
-        fprintf('  Stage %d/%d complete | max = %.6f | RMS = %.6f\n', ...
-            s, numStages, max(abs(y)), rms(y));
+        fprintf('  Stage %d/%d complete | max = %.6f | RMS = %.6f\n', s, numStages, max(abs(y)), rms(y));
     end
-
     y = matchLength(y, length(x));
-
 end
 
-
 function y = smoothPitchShiftPV(x, fs, semitones)
-
     x = x(:);
     originalLength = length(x);
-
-    % Pitch ratio
-    % alpha < 1 means lower pitch
-    % alpha > 1 means higher pitch
     alpha = 2^(semitones / 12);
-
-    % Step 1:
-    % Time-stretch by alpha using phase vocoder.
-    % Then resample back to original length.
-    %
-    % For masculine lowering:
-    % alpha < 1 -> make signal shorter without changing pitch,
-    % then stretch it back by interpolation, which lowers perceived pitch.
     stretched = phaseVocoderTimeStretch(x, fs, alpha);
-
     if max(abs(stretched)) < 1e-8
         warning('Time-stretch produced near silence. Returning original signal.');
         y = x;
         return;
     end
-
-    % Step 2:
-    % Resample stretched signal back to original length
-    oldIndex = (1:length(stretched))';
-    newIndex = linspace(1, length(stretched), originalLength)';
-
-    y = interp1(oldIndex, stretched, newIndex, 'pchip', 0);
-    y = y(:);
-
-    % Length and level safety
-    y = matchLength(y, originalLength);
-
+    y = interp1((1:length(stretched))', stretched, ...
+        linspace(1, length(stretched), originalLength)', 'pchip', 0);
+    y = matchLength(y(:), originalLength);
     if max(abs(y)) > 1e-8
         y = y / max(abs(y) + eps) * max(abs(x));
     else
         warning('Pitch shifted output is near silent. Returning original signal.');
         y = x;
     end
-
 end
 
 function y = phaseVocoderTimeStretch(x, fs, stretchFactor)
-
     x = x(:);
-
-    % Keep stretchFactor in a safe range
     stretchFactor = max(min(stretchFactor, 1.25), 0.75);
-
     N = length(x);
-
     windowLength = 2048;
     analysisHop = windowLength / 4;
     synthesisHop = round(analysisHop * stretchFactor);
-
     win = hann(windowLength, 'periodic');
-
     numFrames = floor((N - windowLength) / analysisHop) + 1;
-
     if numFrames < 2
         y = x;
         return;
     end
-
     outputLength = synthesisHop * (numFrames - 1) + windowLength;
-
     y = zeros(outputLength, 1);
     winSum = zeros(outputLength, 1);
-
+    omega = 2 * pi * (0:windowLength-1)' / windowLength;
     previousPhase = zeros(windowLength, 1);
     synthesisPhase = zeros(windowLength, 1);
-
-    omega = 2 * pi * (0:windowLength-1)' / windowLength;
-
     for frameIndex = 1:numFrames
-
         inputStart = (frameIndex - 1) * analysisHop + 1;
-        inputRange = inputStart:inputStart + windowLength - 1;
-
-        frame = x(inputRange) .* win;
-
+        frame = x(inputStart:inputStart + windowLength - 1) .* win;
         X = fft(frame);
-
-        magnitude = abs(X);
+        mag = abs(X);
         phase = angle(X);
-
         if frameIndex == 1
-
             synthesisPhase = phase;
-
         else
-
-            % Phase difference
-            deltaPhase = phase - previousPhase;
-
-            % Remove expected phase advance
-            expectedPhase = omega * analysisHop;
-            deltaPhase = deltaPhase - expectedPhase;
-
-            % Wrap to [-pi, pi]
+            deltaPhase = phase - previousPhase - omega * analysisHop;
             deltaPhase = deltaPhase - 2*pi*round(deltaPhase / (2*pi));
-
-            % True frequency estimate
-            trueFreq = omega + deltaPhase / analysisHop;
-
-            % Accumulate synthesis phase
-            synthesisPhase = synthesisPhase + trueFreq * synthesisHop;
-
+            synthesisPhase = synthesisPhase + (omega + deltaPhase / analysisHop) * synthesisHop;
         end
-
         previousPhase = phase;
-
-        Y = magnitude .* exp(1i * synthesisPhase);
-
-        frameOut = real(ifft(Y)) .* win;
-
         outputStart = (frameIndex - 1) * synthesisHop + 1;
         outputRange = outputStart:outputStart + windowLength - 1;
-
+        frameOut = real(ifft(mag .* exp(1i * synthesisPhase))) .* win;
         y(outputRange) = y(outputRange) + frameOut;
         winSum(outputRange) = winSum(outputRange) + win.^2;
-
     end
-
     valid = winSum > 1e-8;
     y(valid) = y(valid) ./ winSum(valid);
-
     y = real(y);
-
     if max(abs(y)) > 1e-8
         y = y / max(abs(y) + eps) * max(abs(x));
     end
-
 end
 
-
 function y = removeTinyClicksSafe(x, fs)
-
     y = x(:);
-
-    % Gentle fade only at boundaries
-    fadeLength = round(0.008 * fs);
-    fadeLength = min(fadeLength, floor(length(y) / 2));
-
+    fadeLength = min(round(0.008 * fs), floor(length(y) / 2));
     if fadeLength > 1
-        fadeIn = linspace(0, 1, fadeLength)';
-        fadeOut = linspace(1, 0, fadeLength)';
-
-        y(1:fadeLength) = y(1:fadeLength) .* fadeIn;
-        y(end-fadeLength+1:end) = y(end-fadeLength+1:end) .* fadeOut;
+        y(1:fadeLength) = y(1:fadeLength) .* linspace(0, 1, fadeLength)';
+        y(end-fadeLength+1:end) = y(end-fadeLength+1:end) .* linspace(1, 0, fadeLength)';
     end
-
-    % Very gentle low-pass smoothing
-    % This is weaker than your previous recursive smoothing
     smoothing = 0.04;
-
     for n = 2:length(y)
         y(n) = (1 - smoothing) * y(n) + smoothing * y(n-1);
     end
-
 end
