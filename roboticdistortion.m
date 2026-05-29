@@ -44,9 +44,8 @@ for i = 1:numWindows
     % Overlap-add
     output(startIdx:startIdx+windowSize-1) = output(startIdx:startIdx+windowSize-1) + frameOut;
 end
-% Normalize and play
+% Normalize
 output = output / max(abs(output));
-sound(output, fs);
 % Save output
 audiowrite('outputs/robotic_voice.wav', output, fs);
 

@@ -76,16 +76,11 @@ y_final = y_final / max(abs(y_final) + eps) * 0.95;
 % ============================================================
 
 audiowrite(outputFile, y_final, fs);
-sound(y_final, fs);
 fprintf('Output saved to: %s\n', outputFile);
 
-figure;
-subplot(2,1,1);
-plot(x);
-title('Original waveform');
-subplot(2,1,2);
-plot(y_final);
-title(sprintf('Gender-style converted waveform (%s)', targetStyle));
+% Comparison plot moved to plotGenderConversion.m so batch analysis runs
+% don't generate a figure on every call. Call it manually when needed:
+%   plotGenderConversion(x, y_final, targetStyle);
 
 outputSignal = y_final;
 Fs = fs;

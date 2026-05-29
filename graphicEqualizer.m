@@ -68,9 +68,6 @@ end
 % Normalize
 output = output / max(abs(output));
 
-% Play
-sound(output, fs);
-
 % Save
 audiowrite('outputs/equalized_voice.wav', output, fs);
 

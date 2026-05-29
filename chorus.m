@@ -125,7 +125,6 @@ y_thick = y_thick / max(abs(y_thick) + eps) * 0.95;
 % ============================================================
 
 audiowrite(outputFile, y_thick, fs);
-sound(y_thick, fs);
 
 fprintf('\nOutput saved to: %s\n', outputFile);
 

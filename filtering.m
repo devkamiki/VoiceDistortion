@@ -13,9 +13,8 @@ filter = (f >= cutoffLow) & (f <= cutoffHigh);
 X_filtered = X .* filter';
 % Inverse FFT
 audio_filtered = real(ifft(X_filtered));
-% Normalize and play
+% Normalize
 audio_filtered = audio_filtered / max(abs(audio_filtered));
-sound(audio_filtered, fs);
 audiowrite('outputs/filtered.wav', audio_filtered, fs);
 
 outputSignal = audioread('outputs/filtered.wav');   

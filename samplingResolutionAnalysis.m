@@ -46,19 +46,12 @@ function samplingResolutionAnalysis()
         cleanSig = mean(cleanSig, 2);                       % force mono
         cleanSig = cleanSig / max(abs(cleanSig) + eps);
 
-        % --- Baseline: process at the original (full) sampling rate -------
-        fullProc = processAtRate(test.func, cleanSig, Fs);
-        fullProc = fullProc(:) / max(abs(fullProc) + eps);
-
         fig = figure('Position', [100 100 1100 800], 'Visible', 'off');
 
         % ============ Subplot 1: proper (anti-aliased) downsampling =======
         ax1 = subplot(2,1,1, 'Parent', fig);
         hold(ax1, 'on');
         legend1 = {};
-        fprintf('  Anti-aliased downsampling (resample) vs naive decimation:\n');
-        fprintf('  %-8s | %-9s | reconstruction SNR (dB)\n', 'factor', 'Fs (Hz)');
-        fprintf('  %-8s | %-9s | %-12s %-12s\n', '', '', 'resample', 'decimate');
 
         for k = 1:length(factors)
             M = factors(k);
@@ -80,22 +73,12 @@ function samplingResolutionAnalysis()
                                      M, FsDs, round(FsDs/2)); %#ok<AGROW>
 
             % --- naive decimation (no anti-alias) -> aliasing -------------
-            if M == 1
-                sigAlias = cleanSig;
-            else
-                sigAlias = cleanSig(1:M:end);               % keep every Mth
-            end
-            procAlias = processAtRate(test.func, sigAlias, FsDs);
-            procAlias = procAlias(:) / max(abs(procAlias) + eps);
-
-            % --- quantify: bring both back to full rate and compare -------
-            snrResample = reconstructionSNR(procDs,    M, fullProc);
-            snrDecimate = reconstructionSNR(procAlias, M, fullProc);
-            fprintf('  %-8d | %-9d | %-12.2f %-12.2f\n', ...
-                    M, FsDs, snrResample, snrDecimate);
-
-            % Stash the most aggressive case for the aliasing subplot.
+            % Only the most aggressive factor is needed, for the aliasing
+            % demonstration subplot below.
             if k == length(factors)
+                sigAlias  = cleanSig(1:M:end);              % keep every Mth
+                procAlias = processAtRate(test.func, sigAlias, FsDs);
+                procAlias = procAlias(:) / max(abs(procAlias) + eps);
                 aliasDemo = struct('FsDs',FsDs,'M',M, ...
                                    'proper',procDs,'naive',procAlias);
             end
@@ -142,19 +125,4 @@ function out = processAtRate(fn, sig, Fs)
     catch
     end
     if exist(p, 'file'); delete(p); end
-end
-
-% --- reconstruction SNR: upsample processed-downsampled output back to ----
-% --- the full rate and compare against the full-rate processed output -----
-function snrVal = reconstructionSNR(procDs, M, fullProc)
-    if M == 1
-        up = procDs;
-    else
-        up = resample(procDs, M, 1);
-    end
-    L = min(length(up), length(fullProc));
-    ref = fullProc(1:L);
-    est = up(1:L);
-    est = est / (max(abs(est)) + eps) * (max(abs(ref)) + eps);  % match level
-    snrVal = 10*log10(sum(ref.^2) / (sum((ref - est).^2) + eps));
 end

@@ -37,7 +37,6 @@ end
 
 y = y / max(abs(y)) * 0.95;
 audiowrite(outputFile, y, fs);
-sound(y, fs);
 
 outputSignal = y;
 Fs = fs;
