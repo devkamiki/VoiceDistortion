@@ -1,21 +1,4 @@
 function samplingResolutionAnalysis()
-% SAMPLINGRESOLUTIONANALYSIS  Stress test: sampling rate / effective resolution.
-%
-% For each voice-distortion effect this script reduces the sampling rate of
-% the input before processing and studies the effect on the DFT-based
-% conclusions. Two downsampling methods are compared at every rate:
-%
-%   * "resample"  - polyphase decimation WITH an anti-aliasing low-pass.
-%                   Shows genuine LOSS OF INFORMATION: everything above the
-%                   new Nyquist (Fs_ds/2) is removed and cannot be recovered.
-%   * "decimate"  - naive keep-every-Mth-sample WITHOUT any anti-alias
-%                   filter. Shows ALIASING: energy above Fs_ds/2 folds back
-%                   into the baseband as spurious peaks.
-%
-% The frequency resolution of a length-N DFT is df = Fs/N, so lowering Fs
-% (with N fixed) also makes each bin finer in Hz while shrinking the usable
-% band [0, Fs/2] -- the "effective resolution" trade-off.
-
 
     outputDir = fullfile('results', 'sampling_resolution');
     if ~exist(outputDir, 'dir')
@@ -23,8 +6,10 @@ function samplingResolutionAnalysis()
     end
 
     % Integer downsampling factors relative to each file's native Fs.
-    % factor 1 = full rate (baseline), 6 = aggressive (heavy band-limiting).
-    factors = [1, 2, 4, 6];
+    % factor 1 = full rate (the original / baseline reference).
+    % Each extra factor = one more full (expensive) effect run per test, so
+    % we keep just the original plus one representative heavy downsample.
+    factors = [1, 4];
 
     tests = { ...
         struct('name','Robotic',  'func',@roboticdistortion, 'input','inputfiles/voice-sample.wav'), ...
@@ -46,67 +31,82 @@ function samplingResolutionAnalysis()
         cleanSig = mean(cleanSig, 2);                       % force mono
         cleanSig = cleanSig / max(abs(cleanSig) + eps);
 
+        procRef  = processAtRate(test.func, cleanSig, Fs);
+        procRef  = procRef(:) / max(abs(procRef) + eps);
+        Yref     = avgSpectrum(procRef, N);     % averaged over whole signal
+        refDb    = 20*log10(Yref(half)/max(Yref) + eps);
+        freqRef  = (0:N/2-1) * (Fs / N);
+
         fig = figure('Position', [100 100 1100 800], 'Visible', 'off');
 
-        % ============ Subplot 1: proper (anti-aliased) downsampling =======
         ax1 = subplot(2,1,1, 'Parent', fig);
         hold(ax1, 'on');
         legend1 = {};
+
+       
+        dsFreq = cell(1, length(factors));
+        dsDb   = cell(1, length(factors));
 
         for k = 1:length(factors)
             M = factors(k);
             FsDs = round(Fs / M);
 
-            % --- proper, anti-aliased downsampling -> information loss ----
             if M == 1
-                sigDs = cleanSig;
+                freq = freqRef;
+                yDb  = refDb;
             else
                 sigDs = resample(cleanSig, 1, M);           % polyphase + LPF
+                procDs = processAtRate(test.func, sigDs, FsDs);
+                procDs = procDs(:) / max(abs(procDs) + eps);
+                freq = (0:N/2-1) * (FsDs / N);
+                Y    = avgSpectrum(procDs, N);
+                yDb  = 20*log10(Y(half)/max(Y) + eps);
             end
-            procDs = processAtRate(test.func, sigDs, FsDs);
-            procDs = procDs(:) / max(abs(procDs) + eps);
 
-            freq = (0:N/2-1) * (FsDs / N);
-            Y = abs(fft(procDs, N));
-            plot(ax1, freq, 20*log10(Y(half)/max(Y) + eps), 'LineWidth', 1.2);
-            legend1{end+1} = sprintf('M=%d  (Fs=%d Hz, Ny=%d Hz)', ...
-                                     M, FsDs, round(FsDs/2)); %#ok<AGROW>
+            dsFreq{k} = freq;
+            dsDb{k}   = yDb;
 
-            % --- naive decimation (no anti-alias) -> aliasing -------------
-            % Only the most aggressive factor is needed, for the aliasing
-            % demonstration subplot below.
-            if k == length(factors)
-                sigAlias  = cleanSig(1:M:end);              % keep every Mth
-                procAlias = processAtRate(test.func, sigAlias, FsDs);
-                procAlias = procAlias(:) / max(abs(procAlias) + eps);
-                aliasDemo = struct('FsDs',FsDs,'M',M, ...
-                                   'proper',procDs,'naive',procAlias);
+            plot(ax1, freq, yDb, 'LineWidth', 1.2);
+            if M == 1
+                legend1{end+1} = sprintf('M=1  ORIGINAL (Fs=%d Hz, Ny=%d Hz)', ...
+                                         Fs, round(Fs/2)); %#ok<AGROW>
+            else
+                legend1{end+1} = sprintf('M=%d  (Fs=%d Hz, Ny=%d Hz)', ...
+                                         M, FsDs, round(FsDs/2)); %#ok<AGROW>
             end
         end
 
-        title(ax1, sprintf(['%s  -  anti-aliased downsampling ' ...
-            '(information loss above each Nyquist)'], test.name));
+        title(ax1, sprintf(['%s  -  original (M=1) vs downsampled ' ...
+            '(band ends at each Nyquist)'], test.name));
         xlabel(ax1, 'Frequency (Hz)'); ylabel(ax1, 'Magnitude (dB)');
         legend(ax1, legend1, 'Location', 'southwest');
         grid(ax1, 'on'); xlim(ax1, [0 Fs/2]); ylim(ax1, [-80 5]);
 
-        % ============ Subplot 2: aliasing demonstration ===================
+        % ============ Subplot 2: deviation from the original ==============
+        % For each downsampled spectrum, interpolate the ORIGINAL onto the
+        % same (finer) frequency grid over the shared band [0, Fs_ds/2] and
+        % plot (downsampled - original) in dB. Flat ~0 means the spectral
+        % conclusions are unchanged by downsampling.
         ax2 = subplot(2,1,2, 'Parent', fig);
         hold(ax2, 'on');
-        freqA = (0:N/2-1) * (aliasDemo.FsDs / N);
+        legend2 = {};
 
-        Yp = abs(fft(aliasDemo.proper, N));
-        Yn = abs(fft(aliasDemo.naive,  N));
-        plot(ax2, freqA, 20*log10(Yp(half)/max(Yp) + eps), 'b', 'LineWidth', 1.2);
-        plot(ax2, freqA, 20*log10(Yn(half)/max(Yn) + eps), 'r', 'LineWidth', 1.0);
+        for k = 2:length(factors)                            % skip M=1 (==0)
+            freq = dsFreq{k}(:);
+            refOnGrid = interp1(freqRef, refDb, freq, 'linear');
+            diffDb = dsDb{k}(:) - refOnGrid(:);              % force column: avoid N/2 x N/2 broadcast
+            plot(ax2, freq, diffDb, 'LineWidth', 1.0);
+            FsDs = round(Fs / factors(k));
+            legend2{end+1} = sprintf('M=%d  (vs original, band to %d Hz)', ...
+                                     factors(k), round(FsDs/2)); %#ok<AGROW>
+        end
+        yline(ax2, 0, 'k--');
 
-        title(ax2, sprintf(['M=%d (Fs=%d Hz): anti-aliased vs naive ' ...
-            'decimation - red shows aliased energy folded into the band'], ...
-            aliasDemo.M, aliasDemo.FsDs));
-        xlabel(ax2, 'Frequency (Hz)'); ylabel(ax2, 'Magnitude (dB)');
-        legend(ax2, {'resample (anti-aliased)', 'decimate (aliased)'}, ...
-               'Location', 'southwest');
-        grid(ax2, 'on'); xlim(ax2, [0 aliasDemo.FsDs/2]); ylim(ax2, [-80 5]);
+        title(ax2, sprintf(['%s  -  deviation of downsampled spectrum ' ...
+            'from the original (dB)'], test.name));
+        xlabel(ax2, 'Frequency (Hz)'); ylabel(ax2, '\Delta Magnitude (dB)');
+        legend(ax2, legend2, 'Location', 'southwest');
+        grid(ax2, 'on'); xlim(ax2, [0 Fs/2]); ylim(ax2, [-40 40]);
 
         saveas(fig, fullfile(outputDir, sprintf('%s.png', test.name)));
         close(fig);
@@ -125,4 +125,24 @@ function out = processAtRate(fn, sig, Fs)
     catch
     end
     if exist(p, 'file'); delete(p); end
+end
+
+% --- Welch-style averaged magnitude spectrum over the WHOLE signal --------
+% Avoids the trap of fft(sig, N) using only the first N samples, which can
+% be silent (vocoder latency / leading delays) and yield max(Y)=0 -> NaN.
+function mag = avgSpectrum(sig, N)
+    sig = sig(:);
+    if numel(sig) < N
+        sig = [sig; zeros(N - numel(sig), 1)];
+    end
+    win  = hann(N, 'periodic');
+    hop  = N / 2;                                   % 50% overlap
+    nFr  = 1 + floor((numel(sig) - N) / hop);
+    acc  = zeros(N, 1);
+    for i = 1:nFr
+        s     = (i-1)*hop + 1;
+        frame = sig(s:s+N-1) .* win;
+        acc   = acc + abs(fft(frame));
+    end
+    mag = acc / max(nFr, 1);
 end

@@ -75,4 +75,6 @@ This function converts vocal character between feminine and masculine styles thr
 
 ### Resolution
 
+
+
 ## Web app rewritten in JavaScript

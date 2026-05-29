@@ -12,10 +12,6 @@ if ~exist('outputs', 'dir')
     mkdir('outputs');
 end
 
-% ============================================================
-% READ AUDIO
-% ============================================================
-
 [x, fs] = audioread(inputFile);
 
 if size(x, 2) > 1
@@ -28,9 +24,6 @@ x = x / max(abs(x) + eps);
 fprintf('Input duration: %.2f seconds\n', length(x) / fs);
 fprintf('Sampling rate: %d Hz\n', fs);
 
-% ============================================================
-% PARAMETERS
-% ============================================================
 
 switch targetStyle
 
@@ -52,10 +45,6 @@ switch targetStyle
         error('targetStyle must be "feminine" or "masculine".');
 end
 
-% ============================================================
-% PROCESSING
-% ============================================================
-
 y_pitch = smoothPitchShiftMultiStage(x, fs, pitchShiftSemitones);
 fprintf('After pitch shift: max = %.6f, RMS = %.6f\n', max(abs(y_pitch)), rms(y_pitch));
 
@@ -71,25 +60,13 @@ end
 
 y_final = y_final / max(abs(y_final) + eps) * 0.95;
 
-% ============================================================
-% SAVE AND PLAY
-% ============================================================
-
 audiowrite(outputFile, y_final, fs);
 fprintf('Output saved to: %s\n', outputFile);
-
-% Comparison plot moved to plotGenderConversion.m so batch analysis runs
-% don't generate a figure on every call. Call it manually when needed:
-%   plotGenderConversion(x, y_final, targetStyle);
 
 outputSignal = y_final;
 Fs = fs;
 
 end
-
-% ============================================================
-% LOCAL FUNCTIONS
-% ============================================================
 
 function y = smoothFormantStyle(x, fs, formantScale)
     x = x(:);
