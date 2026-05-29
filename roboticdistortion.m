@@ -1,6 +1,6 @@
 function [outputSignal, Fs] = roboticdistortion(inputFile)
 if nargin < 1
-    inputFile = 'inputfiles/singing-sample.wav';  % fallback
+    inputFile = 'inputfiles/voice-sample.wav';  % fallback
 end
 
 
@@ -35,7 +35,7 @@ for i = 1:numWindows
     mag = abs(F_robot);
     % uncomment one of the two lines below for random or zero phase
     phase = angle(F_robot) + (rand(size(F_robot))-0.5)*phaseRand; % random phase
-    phase = zeros(size(F_robot));   % zero phase instead of random, for more robotic sound
+    %phase = zeros(size(F_robot));   % zero phase instead of random, for more robotic sound
     F_robot = mag .* exp(1j * phase);
     
     % Inverse DFT

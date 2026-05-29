@@ -1,0 +1,17 @@
+# Voice Distortion Tool
+
+## Using the functions to distort the voice
+
+There are five main functions that could be called to process a certain audio.
+
+### Requirements of input
+
+The input format should be `.wav` or `.m4a`. For `.m4a` files, it's required to run the `preprocessing` function in advance to transform it into `.wav` format.
+
+### Introduction of functions
+
+For each function, it takes one parameter as input, that is to say, the path of the audio file. The output is then written in `\output` path of this folder with the name of `[function name].wav`.
+
+If you provide empty parameter, for example, `filtering()`, it will fallback to process the sample audio of our choice.
+
+### 

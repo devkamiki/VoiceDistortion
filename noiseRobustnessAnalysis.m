@@ -1,97 +1,85 @@
 function noiseRobustnessAnalysis()
     outputDir = fullfile('results', 'noise_robustness');
-    mkdir(outputDir);
-    
-    snrLevels = [30, 20, 15, 10, 5, 0];  % dB
-    
-    % Test configurations
+    if ~exist(outputDir, 'dir')
+        mkdir(outputDir);
+    end
+
+    snrLevels = [30, 20, 10, 0];  % dB
+
     tests = { ...
-        struct('name', 'Robotic', ...
-               'script', 'roboticdistortion.m', ...
-               'input', 'inputfiles/voice-sample.wav', ...
-               'output', 'outputs/robotic_voice.wav'), ...
-        ...
-        struct('name', 'Equalizer', ...
-               'script', 'Graphic_equalizer_git.m', ...
-               'input', 'inputfiles/music-sample.wav', ...
-               'output', 'outputs/equalized_voice.wav'), ...
-        ...
-        struct('name', 'Filter', ...
-               'script', 'filtering.m', ...
-               'input', 'inputfiles/music-sample.wav', ...
-               'output', 'outputs/filtered.wav'), ...
-        ...
-        struct('name', 'Chorus', ...
-               'script', 'chorus.m', ...
-               'input', 'inputfiles/singing-sample.wav', ...
-               'output', 'outputs/chorus_warm_thick.wav') ...
+        struct('name','Robotic',  'func',@roboticdistortion, 'input','inputfiles/voice-sample.wav'), ...
+        struct('name','Equalizer','func',@graphicEqualizer,  'input','inputfiles/music-sample.wav'), ...
+        struct('name','Filter',   'func',@filtering,         'input','inputfiles/music-sample.wav'), ...
+        struct('name','Chorus',   'func',@chorus,            'input','inputfiles/singing-sample.wav') ...
     };
-    
+
     for t = 1:length(tests)
         test = tests{t};
-        fprintf(' %s Noise Robustness Test \n', test.name);
-        
+        fprintf(' %s \n', test.name);
+
         [cleanSig, Fs] = audioread(test.input);
-        if size(cleanSig, 2) > 1
-            cleanSig = mean(cleanSig, 2);
-        end
-        cleanSig = cleanSig / max(abs(cleanSig));
-        
+        cleanSig = mean(cleanSig, 2);
+        cleanSig = cleanSig / max(abs(cleanSig) + eps);
+
+        % Baseline
+        cleanPath = fullfile(tempdir, sprintf('clean_%s.wav', test.name));
+        audiowrite(cleanPath, cleanSig, Fs);
+        cleanProc = runEffectQuiet(test.func, cleanPath);
+        cleanProc = cleanProc(:) / max(abs(cleanProc) + eps);
+
+        N = 8192;
+        freq = (0:N/2-1) * (Fs / N);
+        half = 1:N/2;
+
+        Y_cleanOut = abs(fft(cleanProc, N));
+
+        fig = figure('Position', [100 100 1000 600], 'Visible', 'off');
+        plot(freq, 20*log10(Y_cleanOut(half)/max(Y_cleanOut)+eps), 'k', 'LineWidth', 1.5);
+        hold on;
+        legendEntries = {'Clean'};
+
         for i = 1:length(snrLevels)
-            snr = snrLevels(i);
-            fprintf('  SNR = %d dB...\n', snr);
-            
-            % Add noise
-            noisySig = awgn(cleanSig, snr, 'measured');
-            
-            % Save temporary noisy input
-            tempInput = fullfile(tempdir, ['noisy_' test.name '.wav']);
-            audiowrite(tempInput, noisySig, Fs);
-            
-            % Temporarily override input file in script 
-    
-            oldInput = test.input;
-            
-            run(test.script);
-            
-            % Load output 
-            if exist(test.output, 'file')
-                [procSig, ~] = audioread(test.output);
-            else
-                warning('Output not found for %s', test.name);
-                procSig = noisySig;
-            end
-            
-            % DFT Analysis
-            N = 8192;
-            freq = (0:N/2-1) * (Fs / N);
-            
-            Y_clean = abs(fft(cleanSig, N));
-            Y_noisy = abs(fft(noisySig, N));
-            Y_proc  = abs(fft(procSig(1:min(end, N)), N));
-            
-            % Plot
-            figure('Position', [100 100 1400 800], 'Visible', 'off');
-            subplot(2,2,1);
-            plot(freq, 20*log10(Y_clean(1:N/2)/max(Y_clean)), 'b', 'LineWidth', 1.5);
-            hold on;
-            plot(freq, 20*log10(Y_noisy(1:N/2)/max(Y_noisy)), 'r--', 'LineWidth', 1.2);
-            title(sprintf('%s - Clean vs Noisy (SNR=%d dB)', test.name, snr));
-            xlabel('Frequency (Hz)'); ylabel('Magnitude (dB)');
-            legend('Clean', 'Noisy'); grid on;
-            
-            subplot(2,2,2);
-            plot(freq, 20*log10(Y_proc(1:N/2)/max(Y_proc)), 'g', 'LineWidth', 1.5);
-            title(sprintf('%s Processed with Noise', test.name));
-            xlabel('Frequency (Hz)'); ylabel('Magnitude (dB)'); grid on;
-            
-            sgtitle(sprintf('%s Effect - Noise Robustness', test.name));
-            
-            saveas(gcf, fullfile(outputDir, sprintf('%s_snr_%02d.png', test.name, snr)));
-            close(gcf);
+            snrIn = snrLevels(i);
+            noisySig = addNoise(cleanSig, snrIn);
+            noisySig = noisySig / max(abs(noisySig) + eps);
+
+            noisyPath = fullfile(tempdir, sprintf('noisy_%s_%02d.wav', test.name, snrIn));
+            audiowrite(noisyPath, noisySig, Fs);
+            noisyProc = runEffectQuiet(test.func, noisyPath);
+            noisyProc = noisyProc(:) / max(abs(noisyProc) + eps);
+
+            L = min(length(cleanProc), length(noisyProc));
+            cp = cleanProc(1:L);
+            np = noisyProc(1:L);
+
+            Y_noisyOut = abs(fft(np, N));
+            outSNR = 10*log10(sum(cp.^2) / (sum((cp - np).^2) + eps));
+            fprintf('  Input SNR=%2d dB | Output SNR=%6.2f dB\n', snrIn, outSNR);
+
+            plot(freq, 20*log10(Y_noisyOut(half)/max(Y_noisyOut)+eps), 'LineWidth', 1);
+            legendEntries{end+1} = sprintf('SNR_{in}=%d dB', snrIn); %#ok<AGROW>
         end
+
+        title(sprintf('%s - Output spectrum with regard of input noise SNR', test.name));
+        xlabel('Frequency (Hz)'); ylabel('Magnitude (dB)');
+        legend(legendEntries); grid on; xlim([0 Fs/2]); ylim([-80 5]);
+        saveas(fig, fullfile(outputDir, sprintf('%s.png', test.name)));
+        close(fig);
     end
-    
-    fprintf('\n Noise robustness analysis finished\n');
-    fprintf('Figures saved in: %s\n', outputDir);
+
+    fprintf('\nDone. Figures saved in: %s\n', outputDir);
+end
+
+function noisy = addNoise(sig, snrDb)
+    Psig = mean(sig.^2);
+    Pn = Psig / 10^(snrDb/10);
+    noisy = sig + sqrt(Pn) * randn(size(sig));
+end
+
+function out = runEffectQuiet(fn, inputPath)
+    [~, out] = evalc('fn(inputPath)');
+    try
+        clear playsnd
+    catch
+    end
 end
