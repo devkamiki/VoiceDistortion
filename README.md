@@ -73,8 +73,54 @@ This function converts vocal character between feminine and masculine styles thr
 
 ### Noise robustness
 
+`noiseRobustnessAnalysis.m`
+
+#### The idea
+
+We investigated the effect of different levels of noise on the output of our functions.
+
+To produce graphs for analysis, for each effect we:
+
+- Process the clean signal once to get a baseline output.
+- Add white Gaussian noise to the input at four signal-to-noise ratios `snrLevels = [30, 20, 10, 0]` dB, so the noise grows from barely-there up to as loud as the signal itself. Noise power is set from the measured signal power (`addNoise`).
+- Run the same effect on each noisy version and overlay all the output magnitude spectra on one plot.
+
+
+#### Reading the plot
+
+Each figure overlays the output spectrum of the clean run (black) with the outputs at `SNR_in = 30, 20, 10, 0` dB. The closer a coloured curve stays to the black one, the less the added noise survived processing. Where curves separate in the regions the effect is supposed to suppress, that gap shows noise leaking through.
+
+#### What the results show
+
+|Effect|Characteristics|Conclusions|
+|---|---|---|
+|Chorus|The variance is spreaded evenly among the frequency domain. The lines of different colors overlap largely.|Robustness to noise of chorus effect is high in general.|
+|Robotic|
+
 ### Resolution
 
+`samplingResolutionAnalysis.m`
 
+#### The idea
+
+Every effect here is built on the DFT, so a natural question is: **does the answer depend on the sampling rate we happen to run at?** A digital signal sampled at `Fs` can only represent frequencies up to the Nyquist limit `Fs/2`. If we halve or quarter the sampling rate, we shrink that representable band — so the test asks whether each effect still *behaves the same way* on the frequencies that survive, or whether reducing the resolution distorts the result in some less obvious way.
+
+To check this, for each effect we:
+
+1. Take the native signal and downsample it by an integer factor `M` with `resample` (which applies a polyphase anti-aliasing low-pass first, so we don't fold high frequencies back into the band).
+2. Run the **exact same effect** at the reduced rate `Fs/M`.
+3. Compute a Welch-style averaged magnitude spectrum (`avgSpectrum`, Hann window, 50% overlap) over the whole output, so the comparison reflects the entire signal rather than one arbitrary frame.
+4. Compare against the full-rate (`M=1`) result.
+
+We keep the factor list short (`factors = [1, 4]`) on purpose: each extra factor means re-running the full effect — including the expensive phase-vocoder paths — so two factors (original + one clearly-downsampled version) already make the point without a 20-minute runtime.
+
+#### Reading the two subplots
+
+- **Top — overlaid spectra.** The original (`M=1`) and the downsampled (`M=4`) magnitude spectra on the same axes. Each curve simply stops at its own Nyquist: the original reaches `Fs/2`, the downsampled one ends at `Fs/(2M)`. Where the two overlap, they should lie almost on top of each other.
+- **Bottom — deviation.** The downsampled spectrum minus the original (interpolated onto the same grid), in dB, over the shared band. This is the real test: a curve that hugs the `0 dB` dashed line means downsampling did **not** change the spectral shape the effect produces.
+
+#### What the results show
+
+Across all six effects the deviation curve stays within roughly **±a few dB of 0** over the entire shared band (see e.g. `results/sampling_resolution/Equalizer.png`). In other words, the effects are **robust to sampling resolution**: at a quarter of the rate they still shape the spectrum the same way, and the only thing actually lost is the content *above the downsampled Nyquist* — which is expected and unavoidable, since that band can no longer be represented at all. The small residual ripple near 0 dB is ordinary frame-averaging variance, not a systematic bias introduced by the rate change.
 
 ## Web app rewritten in JavaScript
