@@ -213,7 +213,7 @@ function y = smoothPitchShiftPV(x, fs, semitones)
     end
 end
 
-function y = phaseVocoderTimeStretch(x, fs, stretchFactor)
+function y = phaseVocoderTimeStretch(x, ~, stretchFactor)
     x = x(:);
     stretchFactor = max(min(stretchFactor, 1.25), 0.75);
     N = length(x);
