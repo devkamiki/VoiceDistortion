@@ -79,7 +79,7 @@ end
 sgtitle('DFT Size Comparison — STFT reconstruct, avg magnitude per 10 Hz bin');
 
 %% --- FIGURE 2: HOP SIZE COMPARISON (fixed N=16384) ---
-N_fixed    = 16384;
+N_fixed    = 8192;
 hops       = {256, 512, 1024, 2048};
 hop_labels = {'256','512','1024','2048'};
 hop_colors = [0.3 0.7 0.9;
