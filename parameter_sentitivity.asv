@@ -1,0 +1,75 @@
+% DFT Size Comparison — bar spectra at 10 Hz resolution
+clear; clc; close all;
+
+%% --- PARAMETERS ---
+filename   = 'inputfiles/music-sample.wav';
+window_end = 20;          % seconds to analyse
+max_freq   = 4000;         % Hz to display on x-axis
+bin_width  = 10;           % Hz per bar
+
+%% --- LOAD & CROP ---
+[x, fs] = audioread(filename);
+x = mean(x, 2);
+x = x(1 : min(end, round(window_end * fs)));
+
+%% --- COMPUTE AVERAGE MAGNITUDE PER 10 Hz BIN ---
+function mag_bins = compute_bins(x, fs, N, bin_width, max_freq)
+    X      = abs(fft(x, N));          % magnitude (absolute value)
+    X      = X(1:floor(N/2));         % one-sided
+    freqs  = (0:floor(N/2)-1) * fs/N;
+    edges  = 0 : bin_width : max_freq;
+    mag_bins = zeros(1, length(edges)-1);
+    for i = 1:length(edges)-1
+        idx = freqs >= edges(i) & freqs < edges(i+1);
+        if any(idx)
+            mag_bins(i) = mean(X(idx));
+        end
+    end
+end
+
+centers = (bin_width/2 : bin_width : max_freq - bin_width/2);  % bin centres
+shift   = 5;  % Hz shift for lower DFT size bars
+
+N262144 = compute_bins(x, fs, 262144, bin_width, max_freq);
+N131072 = compute_bins(x, fs, 131072, bin_width, max_freq);
+N65536 = compute_bins(x, fs, 65536, bin_width, max_freq);
+N32768  = compute_bins(x, fs,  32768, bin_width, max_freq);
+
+%% --- OUTPUT AUDIO FOR EACH DFT SIZE ---
+for item = {262144, 131072, 65536, 32768}
+    N     = item{1};
+    X_out = fft(x, N);
+    x_rec = real(ifft(X_out, N));
+    x_rec = x_rec(1:min(length(x), N));
+    x_rec = x_rec / max(abs(x_rec) + 1e-10);
+    audiowrite(sprintf('outputs/output_N%d.wav', N), x_rec, fs);
+end
+
+%% --- PLOT ---
+pairs  = {N262144, N131072, N1024, N512};
+labels = {'262144','131072','65536','32768'};
+colors = [0.2 0.5 0.9;   % blue
+          0.9 0.4 0.2;   % orange
+          0.2 0.8 0.4;   % green
+          0.8 0.2 0.6];  % pink
+
+figure('Position', [100 100 1100 750]);
+
+for p = 1:3
+    subplot(3,1,p);
+    hi  = pairs{p};    hi_lbl = labels{p};
+    lo  = pairs{p+1};  lo_lbl = labels{p+1};
+    c1  = colors(p,:);
+    c2  = colors(p+1,:);
+
+    bar(centers,        hi, 0.8, 'FaceColor', c1, 'FaceAlpha', 0.5, 'EdgeColor', 'none'); hold on;
+    bar(centers+shift,  lo, 0.8, 'FaceColor', c2, 'FaceAlpha', 0.5, 'EdgeColor', 'none');
+
+    xlabel('Frequency (Hz)'); ylabel('Magnitude');
+    title(sprintf('N = %s  vs  N = %s', hi_lbl, lo_lbl));
+    legend(sprintf('N=%s', hi_lbl), sprintf('N=%s (shifted +%dHz)', lo_lbl, shift), ...
+           'Location','northeast');
+    xlim([0 max_freq]); grid on;
+end
+
+sgtitle('DFT Size Comparison — avg magnitude per 10 Hz bin');
